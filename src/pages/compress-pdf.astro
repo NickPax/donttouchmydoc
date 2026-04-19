@@ -1,0 +1,136 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ToolHeader from '../components/ToolHeader.astro';
+import CompressTool from '../components/tools/CompressTool.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Faq from '../components/Faq.astro';
+import RelatedTools from '../components/RelatedTools.astro';
+import AdSlot from '../components/AdSlot.astro';
+
+const title = 'Compress PDF online, free — no upload · DontTouchMyDoc';
+const description = 'Shrink scanned PDFs so they fit in email attachments, job applications and upload forms. Runs entirely in your browser — your files never leave your device. Free, no sign-up, no watermarks.';
+
+const steps = [
+  { title: 'Drop the PDF', body: 'Load the file — we count pages, note original size, and keep it all in-memory.' },
+  { title: 'Choose the level', body: 'Light, medium or heavy. Each preset trades a bit of fidelity for a lot of size.' },
+  { title: 'Compress & download', body: 'We re-render and re-embed pages as JPEG inside a fresh PDF, then hand you the result — no servers touched.' },
+];
+
+const faq = [
+  { q: 'How does the compression work?', a: "We render each page via PDF.js, re-encode it as a JPEG at your chosen quality, then rebuild the PDF using <a href='https://pdf-lib.js.org' class='underline'>pdf-lib</a>. Results are dramatic on image-heavy PDFs and scans." },
+  { q: 'Will the text still be searchable?', a: "No — because we flatten pages to images, selectable text becomes visual text. This is great for scans and receipts, less ideal for contracts you need to grep." },
+  { q: 'What do the levels mean?', a: "Light: 1.8× render, ~85% JPEG quality. Medium (default): 1.4×, ~72% quality. Heavy: 1.0×, ~55% quality. The higher the preset, the smaller the output." },
+  { q: 'Sometimes my file barely shrinks — why?', a: "If your PDF is already a compact vector-only document (like a modern export from Word or Pages), the image pipeline can't do much better. Try a higher level, or just don't compress." },
+  { q: 'Is anything sent to a server?', a: "No. Like every tool here, compression runs fully inside your browser tab. The 'network' indicator in the sidebar stays idle throughout." },
+];
+
+const sd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'DontTouchMyDoc Compress PDF',
+    url: 'https://donttouchmydoc.com/compress-pdf',
+    applicationCategory: 'Utilities',
+    operatingSystem: 'Any (browser-based)',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') },
+    })),
+  },
+];
+---
+<BaseLayout title={title} description={description} path="/compress-pdf" structuredData={sd}>
+  <ToolHeader
+    kicker="Tool · 03"
+    title="Compress PDF"
+    tagline="When your scanner gave you a 90 MB file and the upload form accepts 5."
+    description="Pick a level, hit compress. The tool re-renders and re-encodes every page inside your browser — then hands you a smaller file, with no trip to a server."
+    accent="amber"
+  >
+    <svg slot="icon" viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
+  </ToolHeader>
+
+  <CompressTool />
+
+  <!-- When you'd want this -->
+  <section class="mx-auto max-w-[1320px] px-5 sm:px-8 py-20 border-t border-[var(--color-rule)]">
+    <div class="grid md:grid-cols-[320px_1fr] gap-10 items-start">
+      <div class="md:sticky md:top-28 self-start">
+        <div class="section-num">§01b · Use cases</div>
+        <h2 class="mt-2 display-2">When you'd want this.</h2>
+        <p class="mt-4 text-sm text-[color-mix(in_srgb,var(--color-ink)_80%,transparent)] max-w-xs">
+          If your PDF came out of <em class="font-display not-italic">a scanner</em>, chances are it's far bigger than the form you're trying to upload it to.
+        </p>
+      </div>
+
+      <ul class="grid sm:grid-cols-2 gap-4">
+        {[
+          {
+            t: 'Email attachment caps',
+            b: 'Gmail and Outlook cut you off around 25 MB. A quick compress turns "your message bounced" into "sent".',
+            k: 'Email · 25 MB',
+            icon: '<path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="1"/>',
+          },
+          {
+            t: 'Upload forms with strict limits',
+            b: 'Job applications, tax portals, court e-filing, visa sites and insurance claims often cap attachments at 5–10 MB.',
+            k: 'Portals · 5–10 MB',
+            icon: '<path d="M12 4v12M6 10l6-6 6 6"/><path d="M4 18h16"/>',
+          },
+          {
+            t: 'Scanners produce monsters',
+            b: 'Office scanners default to 300 DPI colour — a 20-page contract easily weighs 50–100 MB before anyone gets to read it.',
+            k: 'Scans · 1–5 MB/page',
+            icon: '<rect x="4" y="4" width="16" height="4"/><path d="M4 10h16v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 14h8"/>',
+          },
+          {
+            t: 'Slow connections & mobile data',
+            b: 'Shaving a 40 MB file to 4 MB turns a painful upload on hotel Wi-Fi or 4G into an instant one.',
+            k: 'Mobile · 10× smaller',
+            icon: '<path d="M2 17l6-6 4 4 8-10"/><path d="M14 5h6v6"/>',
+          },
+          {
+            t: 'Storage tiers fill up fast',
+            b: 'Your 5 GB of free Drive space vanishes when you keep scanning bank statements. Smaller files, longer runway.',
+            k: 'Storage · back in the black',
+            icon: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+          },
+          {
+            t: 'Sharing with a human',
+            b: 'Before you Slack a 200 MB receipts PDF at your accountant, think about their inbox. They\'ll thank you.',
+            k: 'Basic manners',
+            icon: '<path d="M4 20c0-3 3-5 6-5h4c3 0 6 2 6 5"/><circle cx="12" cy="8" r="4"/>',
+          },
+        ].map((u) => (
+          <li class="card p-6 flex flex-col min-h-[200px]">
+            <div class="flex items-center justify-between">
+              <span class="w-10 h-10 inline-flex items-center justify-center rounded-sm bg-[color-mix(in_srgb,var(--color-amber)_15%,var(--color-cream))] text-[var(--color-amber)]">
+                <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" set:html={u.icon}></svg>
+              </span>
+              <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">{u.k}</span>
+            </div>
+            <h3 class="mt-6 font-display text-[24px] leading-tight">{u.t}.</h3>
+            <p class="mt-2 text-[14.5px] leading-relaxed text-[color-mix(in_srgb,var(--color-ink)_82%,transparent)]">{u.b}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <p class="mt-10 pt-6 rule font-mono text-[12px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">
+      If your PDF came from Word, Pages or Google Docs, it's probably already small — compression won't help much, and you can skip this tool.
+    </p>
+  </section>
+
+  <AdSlot position="compress-under-tool" size="970x250" />
+  <HowItWorks steps={steps} heading="How compression happens" />
+  <Faq items={faq} heading="Compress PDF · FAQ" />
+  <AdSlot position="compress-faq-bottom" size="728x90" />
+  <RelatedTools current="compress" />
+</BaseLayout>

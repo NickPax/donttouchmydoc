@@ -1,0 +1,66 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ToolHeader from '../components/ToolHeader.astro';
+import MergeTool from '../components/tools/MergeTool.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Faq from '../components/Faq.astro';
+import RelatedTools from '../components/RelatedTools.astro';
+import AdSlot from '../components/AdSlot.astro';
+
+const title = 'Merge PDFs online, free — no upload · DontTouchMyDoc';
+const description = 'Combine multiple PDFs into one, entirely in your browser. Drag, re-order, merge, download — your files never leave your device. Free, no sign-up, no watermarks.';
+
+const steps = [
+  { title: 'Drop the PDFs', body: 'Drag any number of files onto the drop zone. They load into memory locally.' },
+  { title: 'Re-order if needed', body: 'Drag list items up or down. The top of the list becomes page 1 of the combined document.' },
+  { title: 'Merge & save', body: 'Hit "Merge & download". A single combined PDF lands in your downloads folder seconds later.' },
+];
+
+const faq = [
+  { q: 'How many PDFs can I merge at once?', a: "There's no hard cap. In practice you're limited by how much your browser tab can hold in memory — a few hundred megabytes is usually fine." },
+  { q: 'Will the merged file lose quality?', a: "No. Merging copies pages byte-accurately using <a href='https://pdf-lib.js.org' class='underline'>pdf-lib</a>. Text, vectors, annotations and images survive intact. No rasterization." },
+  { q: 'Can I merge password-protected PDFs?', a: "Not at the moment. If a file is encrypted, you'll get an error. Remove the password in your native PDF viewer first, then come back." },
+  { q: 'Are form fields and signatures preserved?', a: "Most interactive form fields and existing signatures carry over. If you need to re-sign the merged file, do that in your signing tool of choice afterwards." },
+  { q: "Is there a size limit?", a: "No artificial limit. If your browser is happy to hold the inputs, we're happy to merge them." },
+];
+
+const sd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'DontTouchMyDoc Merge PDF',
+    url: 'https://donttouchmydoc.com/merge-pdf',
+    applicationCategory: 'Utilities',
+    operatingSystem: 'Any (browser-based)',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') },
+    })),
+  },
+];
+---
+<BaseLayout title={title} description={description} path="/merge-pdf" structuredData={sd}>
+  <ToolHeader
+    kicker="Tool · 01"
+    title="Merge PDFs"
+    tagline="Combine any number of PDFs into one clean file."
+    description="Drag them in, re-order, press merge. No uploads, no accounts, no watermarks, no page limits. Your device does the work."
+    accent="emerald"
+  >
+    <svg slot="icon" viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4h6l4 4v12H7z"/><path d="M13 4v5h5"/><path d="M10 14h6M10 17h4"/></svg>
+  </ToolHeader>
+
+  <MergeTool />
+  <AdSlot position="merge-under-tool" size="970x250" />
+  <HowItWorks steps={steps} heading="Merging, start to finish" />
+  <Faq items={faq} heading="Merge PDF · FAQ" />
+  <AdSlot position="merge-faq-bottom" size="728x90" />
+  <RelatedTools current="merge" />
+</BaseLayout>

@@ -1,0 +1,108 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PrivacyBadge from '../components/PrivacyBadge.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Faq from '../components/Faq.astro';
+import AdSlot from '../components/AdSlot.astro';
+
+const title = 'About DontTouchMyDoc — privacy-first PDF tools';
+const description = 'Why DontTouchMyDoc exists, how it works, and why your files never leave your device. A plain-English explanation of our privacy commitment.';
+
+const steps = [
+  { title: 'You open a page', body: 'Your browser loads a static bundle of HTML, CSS and JavaScript from a CDN. That\'s the whole site.' },
+  { title: 'You pick a file', body: 'The tool loads it into memory inside this tab. Our server never sees the bytes — there is no tool endpoint to hit.' },
+  { title: 'You download the result', body: 'The processed file is generated locally and saved via your browser. Close the tab, and every trace vanishes.' },
+];
+
+const faq = [
+  { q: "How can I verify you're not uploading?", a: "Open your browser's DevTools and switch to the Network tab. Use any of the tools. You'll see the page load, the tool's code chunks load, and then — nothing. No file uploads, no POSTs to an API, no silent background pings." },
+  { q: 'Do you use cookies or localStorage?', a: 'No cookies. No localStorage writes from our tools. We don\'t need either to run, so we don\'t use them. No cookie banner required.' },
+  { q: 'Do you track analytics?', a: "Not at launch. When we do, we'll use a lightweight privacy-preserving counter (think Plausible or similar, self-hosted), and we'll say so here. No Google Analytics, no Facebook pixel." },
+  { q: 'Why does the site have ads?', a: "Tools this useful aren't free to build and maintain. A small number of contextual ads keeps the lights on without adding a paywall. Ads never see your files — they're scoped to the page layout, not the tool." },
+];
+---
+<BaseLayout title={title} description={description} path="/about">
+  <!-- Editorial intro -->
+  <header class="border-b border-[var(--color-rule)]">
+    <div class="relative mx-auto max-w-[1320px] px-5 sm:px-8 pt-16 pb-14">
+      <div aria-hidden="true" class="absolute inset-0 dotfield opacity-35 [mask-image:linear-gradient(to_bottom,black,transparent)]"></div>
+      <div class="relative">
+        <div class="section-num">Colophon · §00</div>
+        <h1 class="mt-2 display-1 max-w-5xl">
+          We built this because most PDF tools quietly <em class="not-italic strike-red">upload</em> your files. We didn't want to be another one.
+        </h1>
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <PrivacyBadge />
+          <span class="chip">static · CDN</span>
+          <span class="chip">zero servers</span>
+          <span class="chip">open standards</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="mx-auto max-w-[1320px] px-5 sm:px-8 py-16 grid md:grid-cols-[1fr_1fr] gap-12 items-start">
+    <div class="prose max-w-none">
+      <h2 class="font-display display-3">The short version.</h2>
+      <p class="mt-4 text-[17px] leading-relaxed text-[color-mix(in_srgb,var(--color-ink)_88%,transparent)]">
+        DontTouchMyDoc is a handful of PDF tools that run entirely inside your browser tab. Merge. Split. Organise. Compress. Redact. Strip line numbers. We don't have a backend. We never receive your files, because there's nowhere to receive them.
+      </p>
+      <p class="mt-4 text-[17px] leading-relaxed text-[color-mix(in_srgb,var(--color-ink)_88%,transparent)]">
+        We built the site because we got tired of using the open-web equivalent of a copy shop where everyone behind the counter squints at your documents. "We'll delete it in 24 hours" is a policy. Not uploading at all is a <em class="font-display not-italic">fact</em>.
+      </p>
+    </div>
+    <div class="card p-6">
+      <div class="section-num">Manifest · §01</div>
+      <h2 class="mt-2 display-3">Our promises.</h2>
+      <ul class="mt-5 space-y-4">
+        {[
+          ['Your files never leave your device.', 'Not to us. Not to a third party. Not to anyone.'],
+          ['No sign-up, ever.', 'No email, no password, no "unlock this feature".'],
+          ['No watermarks, no page limits.', 'The output of the tool is the output. Nothing added, nothing nagging.'],
+          ['No tracking inside the tools.', 'If we ever add analytics, we\'ll say so here, publicly, and use something privacy-preserving.'],
+        ].map(([t, b]) => (
+          <li class="grid grid-cols-[28px_1fr] gap-3">
+            <span class="mt-1 inline-flex w-6 h-6 items-center justify-center rounded-sm bg-[var(--color-emerald-lt)] text-[var(--color-emerald-dk)]">
+              <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+            </span>
+            <div>
+              <div class="font-display text-[20px] leading-tight">{t}</div>
+              <div class="mt-1 text-sm text-[color-mix(in_srgb,var(--color-ink)_80%,transparent)]">{b}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <AdSlot position="about-mid" size="728x90" />
+
+  <section id="privacy" class="mx-auto max-w-[1320px] px-5 sm:px-8 py-16 border-t border-[var(--color-rule)]">
+    <div class="grid md:grid-cols-[minmax(0,380px)_1fr] gap-12 items-start">
+      <div class="md:sticky md:top-28 self-start min-w-0">
+        <div class="section-num">§02 · Privacy</div>
+        <h2 class="mt-2 display-2 [overflow-wrap:anywhere]">Privacy, stated plainly.</h2>
+      </div>
+      <div class="space-y-6 text-[16.5px] leading-relaxed text-[color-mix(in_srgb,var(--color-ink)_88%,transparent)] max-w-2xl">
+        <p>
+          This site is a static bundle of HTML, CSS and JavaScript served from a CDN. There is no application server, no database, no file-upload endpoint. When you drag a PDF onto a tool, the bytes move from your filesystem into your browser's memory. They don't go further.
+        </p>
+        <p>
+          Our tools use two open-source libraries — <span class="font-mono">pdf-lib</span> and <span class="font-mono">pdf.js</span> — bundled into the page. They run inside your browser's sandbox. We cannot read what happens there, and neither can anyone else.
+        </p>
+        <p>
+          We don't set cookies. We don't use localStorage. We don't run third-party scripts inside the tools. If we ever add analytics, it will be a privacy-preserving counter, and we'll say so on this page with the date we added it.
+        </p>
+        <p>
+          To earn the site its keep, we plan to serve a small number of contextual ads around the tools. Ads render in their own frames — they don't and can't peek at the PDF you're working on. If the trade-off isn't to your taste, uBlock is a perfectly reasonable response.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <HowItWorks steps={steps} heading="How the site works" />
+
+  <Faq items={faq} heading="About · FAQ" />
+
+  <AdSlot position="about-bottom" size="728x90" />
+</BaseLayout>

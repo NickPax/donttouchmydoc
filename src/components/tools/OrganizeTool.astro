@@ -1,0 +1,492 @@
+---
+// Client-side PDF page organiser: reorder / rotate / delete pages.
+// Builds the output via pdf-lib copyPages() + setRotation().
+import AdSlot from '../AdSlot.astro';
+---
+<section id="tool" class="mx-auto max-w-[1320px] px-5 sm:px-8 pt-10 pb-16">
+  <div class="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+    <div>
+      <!-- Drop zone -->
+      <div
+        id="dropzone"
+        class="drop-target relative rounded-sm p-10 md:p-14 text-center cursor-pointer"
+        role="button"
+        tabindex="0"
+        aria-label="Drop a PDF here or click to browse"
+      >
+        <div class="scanline rounded-sm" data-scanline hidden></div>
+        <div class="relative">
+          <div class="mx-auto w-14 h-14 inline-flex items-center justify-center rounded-sm bg-[var(--color-navy-800)] text-[var(--color-paper)]">
+            <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="7" height="7"/><rect x="14" y="4" width="7" height="7"/><rect x="3" y="13" width="7" height="7"/><rect x="14" y="13" width="7" height="7"/></svg>
+          </div>
+          <h2 class="mt-5 display-3">Drop a PDF here.</h2>
+          <p class="mt-2 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">
+            Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse</button>.
+            Rearrange, rotate or delete pages — locally, with thumbnails rendered in this tab.
+          </p>
+        </div>
+        <input id="file-input" type="file" accept="application/pdf,.pdf" class="sr-only" />
+      </div>
+
+      <!-- Doc panel -->
+      <div id="doc-panel" class="mt-6 hidden">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="shrink-0 w-10 h-12 border border-[var(--color-rule)] rounded-sm flex items-center justify-center font-display text-[14px] bg-[var(--color-paper)]">PDF</span>
+              <div class="min-w-0">
+                <div id="doc-name" class="font-display text-[22px] truncate">document.pdf</div>
+                <div id="doc-meta" class="font-mono text-[11px] uppercase tracking-[0.14em] text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">—</div>
+              </div>
+            </div>
+            <button id="choose-new" class="btn btn-ghost !py-2 !px-3">Swap file</button>
+          </div>
+
+          <!-- Selection toolbar -->
+          <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span id="selection-count" class="chip chip-ink">0 selected</span>
+              <span id="total-count" class="chip">0 pages</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="select-all"  class="btn btn-ghost !py-2 !px-3">Select all</button>
+              <button id="select-none" class="btn btn-ghost !py-2 !px-3">Clear</button>
+              <button id="rot-left"    class="btn btn-ghost !py-2 !px-3" title="Rotate selected 90° left">
+                <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+                Rotate ↺
+              </button>
+              <button id="rot-right"   class="btn btn-ghost !py-2 !px-3" title="Rotate selected 90° right">
+                <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+                Rotate ↻
+              </button>
+              <button id="delete-sel"  class="btn btn-ghost !py-2 !px-3 text-[var(--color-red-stamp)] border-[var(--color-red-stamp)] hover:bg-[var(--color-red-stamp)] hover:text-[var(--color-paper)]">
+                <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-13M9 7V4h6v3"/></svg>
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rule pt-5">
+            <div class="flex-1 min-w-[240px]">
+              <div class="flex items-center justify-between mb-1.5 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+                <span id="status-label">Idle</span>
+                <span id="progress-num">0%</span>
+              </div>
+              <div class="bar"><span id="progress-bar" style="width:0%"></span></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="reset-btn" class="btn btn-ghost !py-2 !px-3">Reset changes</button>
+              <button id="save-btn" class="btn btn-primary" disabled>
+                Save organised PDF
+                <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v14M6 11l6 6 6-6M5 21h14"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thumbnails grid -->
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-3">
+            <div class="section-num">Pages · drag to reorder</div>
+            <div id="thumbs-note" class="font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">rendering locally…</div>
+          </div>
+          <ul id="thumbs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></ul>
+        </div>
+      </div>
+
+      <div id="err" role="alert" class="mt-6 hidden border border-[var(--color-red-stamp)] bg-[color-mix(in_srgb,#f4d6d1_50%,transparent)] text-[var(--color-red-stamp)] font-mono text-xs uppercase tracking-[0.14em] p-3 rounded-sm"></div>
+    </div>
+
+    <aside class="space-y-5">
+      <div class="card p-5">
+        <div class="section-num">Local runtime</div>
+        <h3 class="font-display text-[22px] mt-1 leading-tight">What's running.</h3>
+        <ul class="mt-3 text-sm space-y-2 font-mono">
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Renderer</span><span>PDF.js</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Builder</span><span>pdf-lib</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Network</span><span class="text-[var(--color-emerald-dk)]">idle</span></li>
+        </ul>
+      </div>
+      <AdSlot position="organize-sidebar" size="300x250" />
+      <div class="card-ink p-5">
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase opacity-80">Tip</div>
+        <p class="mt-2 text-[15px] leading-relaxed">
+          <em class="font-display not-italic">Cmd/Ctrl-click</em> to multi-select. Then rotate or delete the whole batch in one go.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script>
+  import { PDFDocument, degrees } from 'pdf-lib';
+  import { formatBytes, downloadBlob } from '../../lib/format.ts';
+  import { loadPdfjs } from '../../lib/pdfjs-loader.ts';
+
+  type Page = {
+    id: string;
+    srcIndex: number;   // index in the original PDF
+    rotation: 0 | 90 | 180 | 270;
+    selected: boolean;
+  };
+
+  const dropzone  = document.getElementById('dropzone') as HTMLDivElement;
+  const input     = document.getElementById('file-input') as HTMLInputElement;
+  const browse    = document.getElementById('browse') as HTMLButtonElement;
+  const chooseNew = document.getElementById('choose-new') as HTMLButtonElement;
+  const panel     = document.getElementById('doc-panel') as HTMLDivElement;
+  const docName   = document.getElementById('doc-name') as HTMLDivElement;
+  const docMeta   = document.getElementById('doc-meta') as HTMLDivElement;
+  const thumbs    = document.getElementById('thumbs') as HTMLUListElement;
+  const note      = document.getElementById('thumbs-note') as HTMLDivElement;
+  const selCount  = document.getElementById('selection-count') as HTMLSpanElement;
+  const totalCount= document.getElementById('total-count') as HTMLSpanElement;
+  const selectAll = document.getElementById('select-all') as HTMLButtonElement;
+  const selectNone= document.getElementById('select-none') as HTMLButtonElement;
+  const rotLeft   = document.getElementById('rot-left') as HTMLButtonElement;
+  const rotRight  = document.getElementById('rot-right') as HTMLButtonElement;
+  const deleteSel = document.getElementById('delete-sel') as HTMLButtonElement;
+  const resetBtn  = document.getElementById('reset-btn') as HTMLButtonElement;
+  const saveBtn   = document.getElementById('save-btn') as HTMLButtonElement;
+  const progBar   = document.getElementById('progress-bar') as HTMLSpanElement;
+  const progNum   = document.getElementById('progress-num') as HTMLSpanElement;
+  const statusLabel = document.getElementById('status-label') as HTMLSpanElement;
+  const errEl     = document.getElementById('err') as HTMLDivElement;
+  const scan      = dropzone.querySelector('[data-scanline]') as HTMLDivElement;
+
+  let currentFile: File | null = null;
+  let originalRotations: number[] = [];
+  let pages: Page[] = [];
+  let lastSelectedId: string | null = null;
+
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function showErr(msg: string) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 6000);
+  }
+  function setProgress(pct: number, label?: string) {
+    const c = Math.max(0, Math.min(100, pct));
+    progBar.style.width = `${c}%`;
+    progNum.textContent = `${Math.round(c)}%`;
+    if (label) statusLabel.textContent = label;
+  }
+  function normRot(n: number): 0 | 90 | 180 | 270 {
+    const m = ((n % 360) + 360) % 360;
+    return (m === 0 || m === 90 || m === 180 || m === 270) ? (m as 0|90|180|270) : 0;
+  }
+
+  // --- Drop zone wiring ---
+  dropzone.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'browse') return;
+    input.click();
+  });
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  browse.addEventListener('click', (e) => { e.stopPropagation(); input.click(); });
+  chooseNew.addEventListener('click', () => input.click());
+  ['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('is-dragging');
+    if (scan) scan.hidden = false;
+  }));
+  ['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    if (evt === 'dragleave' && (e.target !== dropzone)) return;
+    dropzone.classList.remove('is-dragging');
+    if (scan) scan.hidden = true;
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) handleFile(f);
+    input.value = '';
+  });
+
+  async function handleFile(f: File) {
+    if (!(f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))) {
+      showErr('Only PDF files are accepted.'); return;
+    }
+    currentFile = f;
+    panel.classList.remove('hidden');
+    docName.textContent = f.name;
+    docMeta.textContent = `${formatBytes(f.size)} · loading…`;
+    thumbs.innerHTML = '';
+    saveBtn.disabled = true;
+
+    try {
+      const bytes = await f.arrayBuffer();
+      const doc   = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const count = doc.getPageCount();
+      originalRotations = doc.getPages().map((p) => p.getRotation().angle);
+      pages = Array.from({ length: count }, (_, i) => ({
+        id: uid(),
+        srcIndex: i,
+        rotation: normRot(originalRotations[i]),
+        selected: false,
+      }));
+      docMeta.textContent = `${formatBytes(f.size)} · ${count} page${count===1?'':'s'}`;
+      render();
+      await renderThumbnails(bytes);
+    } catch (err) {
+      console.error(err);
+      showErr('Could not open this PDF. It may be password-protected or corrupt.');
+    }
+  }
+
+  function render() {
+    thumbs.innerHTML = '';
+    const selCountN = pages.filter((p) => p.selected).length;
+    selCount.textContent  = `${selCountN} selected`;
+    totalCount.textContent = `${pages.length} page${pages.length === 1 ? '' : 's'}`;
+    saveBtn.disabled = pages.length === 0;
+
+    pages.forEach((p, idx) => {
+      const li = document.createElement('li');
+      li.className = `relative group card p-2 cursor-pointer ${p.selected ? 'ring-2 ring-[var(--color-emerald-dk)] ring-offset-2 ring-offset-[var(--color-paper)]' : ''}`;
+      li.draggable = true;
+      li.dataset.id = p.id;
+      li.dataset.idx = String(idx);
+      li.innerHTML = `
+        <div class="relative aspect-[3/4] bg-[var(--color-paper-2)] border border-[var(--color-rule)] rounded-sm overflow-hidden flex items-center justify-center">
+          <div class="absolute inset-0 flex items-center justify-center" data-slot="canvas">
+            <span class="font-mono text-[10px] tracking-[0.15em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">page ${p.srcIndex + 1}</span>
+          </div>
+          <span class="absolute top-1 left-1 font-mono text-[10px] px-1.5 py-0.5 rounded-sm bg-[var(--color-navy-800)] text-[var(--color-paper)] tracking-[0.12em]">${String(idx + 1).padStart(2, '0')}</span>
+          ${p.rotation !== 0 ? `<span class="absolute top-1 right-1 font-mono text-[10px] px-1.5 py-0.5 rounded-sm bg-[var(--color-emerald-dk)] text-[var(--color-paper)]">${p.rotation}°</span>` : ''}
+        </div>
+        <div class="mt-1.5 flex items-center justify-between font-mono text-[10px] tracking-[0.14em] uppercase text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+          <span>src · p${p.srcIndex + 1}</span>
+          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button data-action="rot-left"  class="w-5 h-5 inline-flex items-center justify-center rounded-sm border border-[var(--color-rule)] hover:bg-[var(--color-paper)]" title="Rotate left"><svg viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+            <button data-action="rot-right" class="w-5 h-5 inline-flex items-center justify-center rounded-sm border border-[var(--color-rule)] hover:bg-[var(--color-paper)]" title="Rotate right"><svg viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+            <button data-action="delete"    class="w-5 h-5 inline-flex items-center justify-center rounded-sm border border-[var(--color-rule)] text-[var(--color-red-stamp)] hover:bg-[var(--color-red-stamp)] hover:text-[var(--color-paper)]" title="Delete page"><svg viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          </div>
+        </div>
+      `;
+      thumbs.appendChild(li);
+    });
+
+    // Preserve any previously-rendered thumbnail images by regenerating them.
+    restoreThumbnailCanvases();
+  }
+
+  // --- Thumbnail rendering, once per file load ---
+  const canvasCache = new Map<number, HTMLCanvasElement>();
+  async function renderThumbnails(bytes: ArrayBuffer) {
+    note.textContent = 'rendering locally…';
+    const pdfjs = await loadPdfjs();
+    const doc = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
+    canvasCache.clear();
+    const max = Math.min(doc.numPages, 120); // safety cap
+    for (let i = 1; i <= max; i++) {
+      (async () => {
+        try {
+          const page = await doc.getPage(i);
+          const vp   = page.getViewport({ scale: 1 });
+          const scale = Math.min(200 / vp.width, 280 / vp.height);
+          const v    = page.getViewport({ scale });
+          const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+          const canvas = document.createElement('canvas');
+          canvas.width  = Math.floor(v.width * dpr);
+          canvas.height = Math.floor(v.height * dpr);
+          canvas.style.maxWidth  = '100%';
+          canvas.style.maxHeight = '100%';
+          const ctx = canvas.getContext('2d')!;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          await page.render({ canvasContext: ctx, viewport: v }).promise;
+          canvasCache.set(i - 1, canvas);
+          restoreThumbnailCanvases();
+        } catch {}
+      })();
+    }
+    note.textContent = `${max} of ${doc.numPages} previewed`;
+  }
+
+  function restoreThumbnailCanvases() {
+    const lis = thumbs.querySelectorAll('li[data-id]');
+    lis.forEach((li) => {
+      const id = (li as HTMLElement).dataset.id!;
+      const p = pages.find((x) => x.id === id);
+      if (!p) return;
+      const slot = li.querySelector('[data-slot="canvas"]') as HTMLElement;
+      const cv   = canvasCache.get(p.srcIndex);
+      if (slot && cv) {
+        const img = cv.cloneNode(true) as HTMLCanvasElement;
+        // copy pixel data too
+        const tctx = img.getContext('2d')!;
+        tctx.drawImage(cv, 0, 0);
+        img.style.transform = `rotate(${p.rotation}deg)`;
+        img.style.transformOrigin = 'center';
+        slot.innerHTML = '';
+        slot.appendChild(img);
+      }
+    });
+  }
+
+  // --- Selection & per-thumbnail actions ---
+  thumbs.addEventListener('click', (e) => {
+    const li = (e.target as HTMLElement).closest('li[data-id]') as HTMLLIElement | null;
+    if (!li) return;
+    const id = li.dataset.id!;
+    const actionBtn = (e.target as HTMLElement).closest('[data-action]') as HTMLButtonElement | null;
+    const page = pages.find((p) => p.id === id);
+    if (!page) return;
+
+    if (actionBtn) {
+      const action = actionBtn.dataset.action;
+      if (action === 'rot-left')  page.rotation = normRot(page.rotation - 90);
+      if (action === 'rot-right') page.rotation = normRot(page.rotation + 90);
+      if (action === 'delete')    pages = pages.filter((x) => x.id !== id);
+      render();
+      return;
+    }
+
+    // Shift range-select
+    if (e.shiftKey && lastSelectedId) {
+      const i1 = pages.findIndex((p) => p.id === lastSelectedId);
+      const i2 = pages.findIndex((p) => p.id === id);
+      if (i1 !== -1 && i2 !== -1) {
+        const [lo, hi] = i1 < i2 ? [i1, i2] : [i2, i1];
+        for (let i = lo; i <= hi; i++) pages[i].selected = true;
+      }
+    } else if (e.metaKey || e.ctrlKey) {
+      page.selected = !page.selected;
+    } else {
+      const wasSelected = page.selected;
+      pages.forEach((p) => (p.selected = false));
+      page.selected = !wasSelected;
+    }
+    lastSelectedId = id;
+    render();
+  });
+
+  selectAll.addEventListener('click',  () => { pages.forEach((p) => p.selected = true);  render(); });
+  selectNone.addEventListener('click', () => { pages.forEach((p) => p.selected = false); render(); });
+  rotLeft.addEventListener('click', () => {
+    const sel = pages.filter((p) => p.selected);
+    const targets = sel.length ? sel : pages;
+    targets.forEach((p) => (p.rotation = normRot(p.rotation - 90)));
+    render();
+  });
+  rotRight.addEventListener('click', () => {
+    const sel = pages.filter((p) => p.selected);
+    const targets = sel.length ? sel : pages;
+    targets.forEach((p) => (p.rotation = normRot(p.rotation + 90)));
+    render();
+  });
+  deleteSel.addEventListener('click', () => {
+    const selected = pages.filter((p) => p.selected);
+    if (!selected.length) { showErr('Nothing selected. Click pages first.'); return; }
+    pages = pages.filter((p) => !p.selected);
+    render();
+  });
+  resetBtn.addEventListener('click', () => {
+    if (!currentFile || !originalRotations.length) return;
+    pages = originalRotations.map((rot, i) => ({
+      id: uid(), srcIndex: i, rotation: normRot(rot), selected: false,
+    }));
+    render();
+  });
+
+  // --- Drag reorder ---
+  // DOM-first: move the <li> directly while dragging (so the browser doesn't
+  // lose its drag source), then sync `pages` from the DOM order on dragend.
+  let dragId: string | null = null;
+  let lastOverKey: string | null = null;
+
+  thumbs.addEventListener('dragstart', (e) => {
+    const li = (e.target as HTMLElement).closest('li[data-id]') as HTMLLIElement | null;
+    if (!li) return;
+    dragId = li.dataset.id!;
+    lastOverKey = null;
+    li.style.opacity = '0.4';
+    li.classList.add('outline', 'outline-2', 'outline-[var(--color-emerald-dk)]');
+    e.dataTransfer!.effectAllowed = 'move';
+    // Some browsers need a data payload for drag to actually start.
+    try { e.dataTransfer!.setData('text/plain', dragId); } catch {}
+  });
+
+  thumbs.addEventListener('dragover', (e) => {
+    if (!dragId) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+    const overLi = (e.target as HTMLElement).closest('li[data-id]') as HTMLLIElement | null;
+    if (!overLi || overLi.dataset.id === dragId) return;
+    const rect = overLi.getBoundingClientRect();
+    // Grid-aware: compare both axes so horizontal reshuffling within a row still works.
+    const halfW = rect.width / 2;
+    const halfH = rect.height / 2;
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const isAfter = localY > halfH || (Math.abs(localY - halfH) < 6 && localX > halfW);
+    const key = `${overLi.dataset.id}:${isAfter ? 'after' : 'before'}`;
+    if (key === lastOverKey) return;
+    lastOverKey = key;
+    const draggedLi = thumbs.querySelector(`li[data-id="${dragId}"]`) as HTMLLIElement | null;
+    if (!draggedLi) return;
+    overLi.parentNode!.insertBefore(draggedLi, isAfter ? overLi.nextSibling : overLi);
+  });
+
+  thumbs.addEventListener('drop', (e) => { e.preventDefault(); });
+
+  thumbs.addEventListener('dragend', () => {
+    const draggedLi = dragId ? thumbs.querySelector(`li[data-id="${dragId}"]`) as HTMLLIElement | null : null;
+    if (draggedLi) {
+      draggedLi.style.opacity = '';
+      draggedLi.classList.remove('outline', 'outline-2', 'outline-[var(--color-emerald-dk)]');
+    }
+    // Read the new order out of the DOM and rebuild `pages` in that order.
+    const lis = Array.from(thumbs.querySelectorAll('li[data-id]')) as HTMLLIElement[];
+    const byId = new Map(pages.map((p) => [p.id, p]));
+    const reordered: Page[] = [];
+    for (const li of lis) {
+      const p = byId.get(li.dataset.id!);
+      if (p) reordered.push(p);
+    }
+    if (reordered.length === pages.length) pages = reordered;
+    dragId = null;
+    lastOverKey = null;
+    render();
+  });
+
+  // --- Save ---
+  saveBtn.addEventListener('click', async () => {
+    if (!currentFile || !pages.length) return;
+    saveBtn.disabled = true;
+    try {
+      setProgress(2, 'Loading source');
+      const bytes = await currentFile.arrayBuffer();
+      const src   = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const out   = await PDFDocument.create();
+      out.setProducer('DontTouchMyDoc (local)');
+      out.setCreator('DontTouchMyDoc');
+
+      const indices = pages.map((p) => p.srcIndex);
+      setProgress(10, 'Copying pages');
+      const copied = await out.copyPages(src, indices);
+      for (let i = 0; i < copied.length; i++) {
+        setProgress(10 + (i / copied.length) * 86, `Page ${i + 1} / ${copied.length}`);
+        copied[i].setRotation(degrees(pages[i].rotation));
+        out.addPage(copied[i]);
+      }
+      setProgress(97, 'Writing output');
+      const output = await out.save({ useObjectStreams: true });
+      setProgress(100, 'Done');
+
+      const base = currentFile.name.replace(/\.pdf$/i, '') || 'document';
+      downloadBlob(new Blob([output], { type: 'application/pdf' }), `${base}-organised.pdf`);
+      setTimeout(() => setProgress(0, 'Idle'), 1500);
+    } catch (err) {
+      console.error(err);
+      showErr('Couldn\'t save this PDF. It may be password-protected or corrupt.');
+      setProgress(0, 'Idle');
+    } finally {
+      saveBtn.disabled = pages.length === 0;
+    }
+  });
+</script>

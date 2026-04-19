@@ -1,0 +1,320 @@
+---
+// Client-side PDF merge tool. All logic runs in the browser <script>.
+import AdSlot from '../AdSlot.astro';
+---
+<section id="tool" class="mx-auto max-w-[1320px] px-5 sm:px-8 pt-10 pb-16">
+  <div class="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+    <div>
+      <!-- Drop zone -->
+      <div
+        id="dropzone"
+        class="drop-target relative rounded-sm p-10 md:p-16 text-center cursor-pointer"
+        role="button"
+        tabindex="0"
+        aria-label="Drop PDFs here or click to browse"
+      >
+        <div class="scanline rounded-sm" data-scanline hidden></div>
+        <div class="relative">
+          <div class="mx-auto w-14 h-14 inline-flex items-center justify-center rounded-sm bg-[var(--color-emerald-lt)] text-[var(--color-emerald-dk)]">
+            <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 15V3M7 8l5-5 5 5M5 21h14"/>
+            </svg>
+          </div>
+          <h2 class="mt-5 display-3">Drop PDFs here.</h2>
+          <p class="mt-2 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">
+            Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse from your device</button>.
+            They stay on your device — the "Merge" button runs inside this tab.
+          </p>
+          <p class="mt-4 font-mono text-[11px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">
+            PDF · up to as many as your RAM allows
+          </p>
+        </div>
+        <input id="file-input" type="file" accept="application/pdf,.pdf" multiple class="sr-only" />
+      </div>
+
+      <!-- File list -->
+      <div id="list-wrap" class="mt-6 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <span class="section-num">Queue</span>
+            <span id="count" class="chip chip-ink">0 files</span>
+            <span id="pages" class="chip">0 pages</span>
+            <span id="size" class="chip">0 B</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="add-more" class="btn btn-ghost !py-2 !px-3">
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add more
+            </button>
+            <button id="clear" class="btn btn-ghost !py-2 !px-3">Clear</button>
+          </div>
+        </div>
+        <ul id="file-list" class="space-y-2"></ul>
+        <p class="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">
+          Drag to re-order · Top of list becomes page 1
+        </p>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rule pt-6">
+          <div class="flex-1 min-w-[240px]">
+            <div class="flex items-center justify-between mb-1.5 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+              <span id="status-label">Idle</span>
+              <span id="progress-num">0%</span>
+            </div>
+            <div class="bar"><span id="progress-bar" style="width:0%"></span></div>
+          </div>
+          <button id="merge-btn" class="btn btn-primary" disabled>
+            Merge &amp; download
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v14M6 11l6 6 6-6M5 21h14"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="err" role="alert" class="mt-6 hidden border border-[var(--color-red-stamp)] bg-[color-mix(in_srgb,#f4d6d1_50%,transparent)] text-[var(--color-red-stamp)] font-mono text-xs uppercase tracking-[0.14em] p-3 rounded-sm"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="space-y-5">
+      <div class="card p-5">
+        <div class="section-num">Local runtime</div>
+        <h3 class="font-display text-[22px] mt-1 leading-tight">What's running.</h3>
+        <ul class="mt-3 text-sm space-y-2 font-mono">
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Engine</span><span>pdf-lib · WASM-free</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Network</span><span class="text-[var(--color-emerald-dk)]">idle</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Where</span><span>this browser tab</span></li>
+        </ul>
+      </div>
+      <AdSlot position="merge-sidebar" size="300x250" />
+      <div class="card-ink p-5">
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase opacity-80">Pro tip</div>
+        <p class="mt-2 text-[15px] leading-relaxed">
+          Giant files? Merge them <em class="font-display not-italic">two at a time</em>. Your tab will thank you, and the result is identical.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script>
+  import { PDFDocument } from 'pdf-lib';
+  import { formatBytes, downloadBlob } from '../../lib/format.ts';
+
+  type Item = { id: string; file: File; pages: number | null; sizeLabel: string };
+
+  const items: Item[] = [];
+  const dropzone = document.getElementById('dropzone') as HTMLDivElement;
+  const input    = document.getElementById('file-input') as HTMLInputElement;
+  const browse   = document.getElementById('browse') as HTMLButtonElement;
+  const addMore  = document.getElementById('add-more') as HTMLButtonElement;
+  const clear    = document.getElementById('clear') as HTMLButtonElement;
+  const listEl   = document.getElementById('file-list') as HTMLUListElement;
+  const wrap     = document.getElementById('list-wrap') as HTMLDivElement;
+  const count    = document.getElementById('count') as HTMLSpanElement;
+  const pagesEl  = document.getElementById('pages') as HTMLSpanElement;
+  const sizeEl   = document.getElementById('size') as HTMLSpanElement;
+  const mergeBtn = document.getElementById('merge-btn') as HTMLButtonElement;
+  const errEl    = document.getElementById('err') as HTMLDivElement;
+  const progBar  = document.getElementById('progress-bar') as HTMLSpanElement;
+  const progNum  = document.getElementById('progress-num') as HTMLSpanElement;
+  const statusLabel = document.getElementById('status-label') as HTMLSpanElement;
+  const scan     = dropzone.querySelector('[data-scanline]') as HTMLDivElement;
+
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function showErr(msg: string) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 6000);
+  }
+  function setProgress(pct: number, label?: string) {
+    const clamped = Math.max(0, Math.min(100, pct));
+    progBar.style.width = `${clamped}%`;
+    progNum.textContent = `${Math.round(clamped)}%`;
+    if (label) statusLabel.textContent = label;
+  }
+
+  async function addFiles(files: FileList | File[]) {
+    const list = Array.from(files).filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+    if (!list.length) { showErr('Only PDF files are accepted.'); return; }
+    for (const file of list) {
+      if (file.size > 100 * 1024 * 1024) {
+        showErr(`"${file.name}" is over 100 MB — consider compressing first.`);
+      }
+      const item: Item = { id: uid(), file, pages: null, sizeLabel: formatBytes(file.size) };
+      items.push(item);
+      // Read page count in the background
+      file.arrayBuffer().then(async (buf) => {
+        try {
+          const doc = await PDFDocument.load(buf, { updateMetadata: false, ignoreEncryption: true });
+          item.pages = doc.getPageCount();
+          render();
+        } catch (e) {
+          item.pages = -1; // indicates corrupt / encrypted
+          render();
+        }
+      });
+    }
+    render();
+  }
+
+  function render() {
+    if (!items.length) {
+      wrap.classList.add('hidden');
+      mergeBtn.disabled = true;
+      return;
+    }
+    wrap.classList.remove('hidden');
+    listEl.innerHTML = '';
+    let totalPages = 0;
+    let totalSize  = 0;
+    let hasError = false;
+
+    items.forEach((it, index) => {
+      const li = document.createElement('li');
+      li.draggable = true;
+      li.dataset.id = it.id;
+      li.className = 'card flex items-center gap-4 p-3 pl-2 group cursor-grab active:cursor-grabbing';
+      li.innerHTML = `
+        <span class="shrink-0 w-8 text-center font-mono text-[11px] tracking-[0.15em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">${String(index + 1).padStart(2,'0')}</span>
+        <span class="shrink-0 w-8 h-10 border border-[var(--color-rule)] rounded-sm flex items-center justify-center font-display text-[14px] bg-[var(--color-paper)]">PDF</span>
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-[15px]">${escapeHtml(it.file.name)}</div>
+          <div class="mt-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">
+            ${it.sizeLabel}
+            · ${it.pages === null ? 'reading…' : it.pages === -1 ? '<span style="color:var(--color-red-stamp)">unreadable</span>' : `${it.pages} page${it.pages===1?'':'s'}`}
+          </div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button class="w-8 h-8 inline-flex items-center justify-center rounded-sm border border-transparent hover:border-[var(--color-rule)]" data-action="up"  aria-label="Move up"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 15l6-6 6 6"/></svg></button>
+          <button class="w-8 h-8 inline-flex items-center justify-center rounded-sm border border-transparent hover:border-[var(--color-rule)]" data-action="down"aria-label="Move down"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="w-8 h-8 inline-flex items-center justify-center rounded-sm border border-transparent hover:border-[var(--color-rule)] hover:text-[var(--color-red-stamp)]" data-action="remove" aria-label="Remove"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          <span class="ml-2 pr-1 text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)] font-mono text-[11px] tracking-[0.18em] uppercase">drag</span>
+        </div>
+      `;
+      listEl.appendChild(li);
+      if (it.pages && it.pages > 0) totalPages += it.pages;
+      totalSize += it.file.size;
+      if (it.pages === -1) hasError = true;
+    });
+
+    count.textContent  = `${items.length} file${items.length === 1 ? '' : 's'}`;
+    pagesEl.textContent = `${totalPages} pages`;
+    sizeEl.textContent  = formatBytes(totalSize);
+    mergeBtn.disabled   = items.length < 2 || hasError || items.some((i) => i.pages === null);
+  }
+
+  function escapeHtml(s: string) {
+    return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  }
+
+  // List actions (delegate)
+  listEl.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLButtonElement | null;
+    if (!btn) return;
+    const li = btn.closest('li') as HTMLLIElement;
+    const idx = items.findIndex((it) => it.id === li.dataset.id);
+    if (idx === -1) return;
+    const action = btn.dataset.action;
+    if (action === 'remove') items.splice(idx, 1);
+    if (action === 'up' && idx > 0) { [items[idx-1], items[idx]] = [items[idx], items[idx-1]]; }
+    if (action === 'down' && idx < items.length - 1) { [items[idx+1], items[idx]] = [items[idx], items[idx+1]]; }
+    render();
+  });
+
+  // Drag reorder
+  let dragId: string | null = null;
+  listEl.addEventListener('dragstart', (e) => {
+    const li = (e.target as HTMLElement).closest('li') as HTMLLIElement | null;
+    if (!li) return;
+    dragId = li.dataset.id ?? null;
+    li.style.opacity = '0.5';
+    e.dataTransfer!.effectAllowed = 'move';
+  });
+  listEl.addEventListener('dragend', (e) => {
+    const li = (e.target as HTMLElement).closest('li') as HTMLLIElement | null;
+    if (li) li.style.opacity = '';
+    dragId = null;
+  });
+  listEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const overLi = (e.target as HTMLElement).closest('li') as HTMLLIElement | null;
+    if (!overLi || !dragId || overLi.dataset.id === dragId) return;
+    const fromIdx = items.findIndex((it) => it.id === dragId);
+    const toIdx   = items.findIndex((it) => it.id === overLi.dataset.id);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    render();
+    // Keep the dragged element highlighted
+    const newLi = listEl.querySelector(`li[data-id="${dragId}"]`) as HTMLLIElement | null;
+    if (newLi) newLi.style.opacity = '0.5';
+  });
+
+  // Drop zone events
+  dropzone.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'browse') return;
+    input.click();
+  });
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  browse.addEventListener('click', (e) => { e.stopPropagation(); input.click(); });
+  addMore.addEventListener('click', () => input.click());
+  clear.addEventListener('click', () => { items.length = 0; render(); });
+
+  ['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('is-dragging');
+    if (scan) scan.hidden = false;
+  }));
+  ['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    if (evt === 'dragleave' && (e.target !== dropzone)) return;
+    dropzone.classList.remove('is-dragging');
+    if (scan) scan.hidden = true;
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer?.files;
+    if (files && files.length) addFiles(files);
+  });
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length) addFiles(input.files);
+    input.value = '';
+  });
+
+  // Merge
+  mergeBtn.addEventListener('click', async () => {
+    if (items.length < 2) return;
+    mergeBtn.disabled = true;
+    try {
+      setProgress(2, 'Reading files');
+      const merged = await PDFDocument.create();
+      merged.setProducer('DontTouchMyDoc (local)');
+      merged.setCreator('DontTouchMyDoc');
+      const total = items.length;
+      for (let i = 0; i < total; i++) {
+        const f = items[i].file;
+        const buf = await f.arrayBuffer();
+        setProgress(4 + (i / total) * 80, `Merging ${i + 1} / ${total}`);
+        const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+        const pages = await merged.copyPages(src, src.getPageIndices());
+        pages.forEach((p) => merged.addPage(p));
+      }
+      setProgress(92, 'Writing output');
+      const bytes = await merged.save({ useObjectStreams: true });
+      setProgress(100, 'Done');
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), filename());
+      setTimeout(() => setProgress(0, 'Idle'), 1500);
+    } catch (err) {
+      console.error(err);
+      showErr('Couldn\'t merge these files. They might be password-protected or corrupt.');
+      setProgress(0, 'Idle');
+    } finally {
+      mergeBtn.disabled = items.length < 2;
+    }
+  });
+
+  function filename() {
+    const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    return `dtmd-merged-${stamp}.pdf`;
+  }
+</script>

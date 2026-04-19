@@ -1,0 +1,300 @@
+---
+// Client-side PDF compress tool.
+// Strategy: render each page via PDF.js, re-encode as JPEG at a target quality, rebuild with pdf-lib.
+import AdSlot from '../AdSlot.astro';
+---
+<section id="tool" class="mx-auto max-w-[1320px] px-5 sm:px-8 pt-10 pb-16">
+  <div class="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+    <div>
+      <!-- Drop zone -->
+      <div
+        id="dropzone"
+        class="drop-target relative rounded-sm p-10 md:p-14 text-center cursor-pointer"
+        role="button"
+        tabindex="0"
+        aria-label="Drop a PDF here or click to browse"
+      >
+        <div class="scanline rounded-sm" data-scanline hidden></div>
+        <div class="relative">
+          <div class="mx-auto w-14 h-14 inline-flex items-center justify-center rounded-sm bg-[color-mix(in_srgb,var(--color-amber)_18%,var(--color-cream))] text-[var(--color-amber)]">
+            <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
+          </div>
+          <h2 class="mt-5 display-3">Drop a PDF here.</h2>
+          <p class="mt-2 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">
+            Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse</button>.
+            We shrink by re-encoding images locally. Nothing uploads.
+          </p>
+        </div>
+        <input id="file-input" type="file" accept="application/pdf,.pdf" class="sr-only" />
+      </div>
+
+      <!-- Document panel -->
+      <div id="doc-panel" class="mt-6 hidden">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="shrink-0 w-10 h-12 border border-[var(--color-rule)] rounded-sm flex items-center justify-center font-display text-[14px] bg-[var(--color-paper)]">PDF</span>
+              <div class="min-w-0">
+                <div id="doc-name" class="font-display text-[22px] truncate">document.pdf</div>
+                <div id="doc-meta" class="font-mono text-[11px] uppercase tracking-[0.14em] text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">—</div>
+              </div>
+            </div>
+            <button id="choose-new" class="btn btn-ghost !py-2 !px-3">Swap file</button>
+          </div>
+
+          <!-- Level -->
+          <div class="mt-6 grid sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Compression level">
+            <label class="relative flex flex-col gap-1.5 p-4 rounded-sm border border-[var(--color-rule)] cursor-pointer has-[:checked]:border-[var(--color-emerald-dk)] has-[:checked]:bg-[var(--color-emerald-lt)]">
+              <input type="radio" name="level" value="light" class="absolute top-3 right-3" />
+              <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">Level 01</div>
+              <div class="font-display text-[22px] leading-tight">Light.</div>
+              <div class="text-xs text-[color-mix(in_srgb,var(--color-ink)_78%,transparent)]">Re-encode; keep things sharp.</div>
+              <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--color-emerald-dk)]">~20–40% smaller</div>
+            </label>
+            <label class="relative flex flex-col gap-1.5 p-4 rounded-sm border border-[var(--color-rule)] cursor-pointer has-[:checked]:border-[var(--color-emerald-dk)] has-[:checked]:bg-[var(--color-emerald-lt)]">
+              <input type="radio" name="level" value="medium" class="absolute top-3 right-3" checked />
+              <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">Level 02 · default</div>
+              <div class="font-display text-[22px] leading-tight">Medium.</div>
+              <div class="text-xs text-[color-mix(in_srgb,var(--color-ink)_78%,transparent)]">Good balance. Email-friendly.</div>
+              <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--color-emerald-dk)]">~40–70% smaller</div>
+            </label>
+            <label class="relative flex flex-col gap-1.5 p-4 rounded-sm border border-[var(--color-rule)] cursor-pointer has-[:checked]:border-[var(--color-emerald-dk)] has-[:checked]:bg-[var(--color-emerald-lt)]">
+              <input type="radio" name="level" value="heavy" class="absolute top-3 right-3" />
+              <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">Level 03</div>
+              <div class="font-display text-[22px] leading-tight">Heavy.</div>
+              <div class="text-xs text-[color-mix(in_srgb,var(--color-ink)_78%,transparent)]">Ruthless. Good for scans.</div>
+              <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--color-emerald-dk)]">~60–85% smaller</div>
+            </label>
+          </div>
+
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rule pt-5">
+            <div class="flex-1 min-w-[240px]">
+              <div class="flex items-center justify-between mb-1.5 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+                <span id="status-label">Idle</span>
+                <span id="progress-num">0%</span>
+              </div>
+              <div class="bar"><span id="progress-bar" style="width:0%"></span></div>
+            </div>
+            <button id="compress-btn" class="btn btn-primary" disabled>
+              Compress &amp; download
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v14M6 11l6 6 6-6M5 21h14"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Result display -->
+        <div id="result" class="mt-6 card p-6 hidden">
+          <div class="flex items-center justify-between">
+            <div class="section-num">Result</div>
+            <span class="stamp">Compressed · Locally</span>
+          </div>
+          <div class="mt-4 grid sm:grid-cols-3 gap-4">
+            <div>
+              <div class="kicker">Before</div>
+              <div id="r-before" class="font-display text-[34px] leading-none mt-1">—</div>
+            </div>
+            <div>
+              <div class="kicker">After</div>
+              <div id="r-after" class="font-display text-[34px] leading-none mt-1 text-[var(--color-emerald-dk)]">—</div>
+            </div>
+            <div>
+              <div class="kicker">Saved</div>
+              <div id="r-saved" class="font-display text-[34px] leading-none mt-1">—</div>
+            </div>
+          </div>
+          <div class="mt-4 bar"><span id="r-bar" style="width:0%"></span></div>
+          <p id="r-meta" class="mt-3 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">—</p>
+        </div>
+      </div>
+
+      <div id="err" role="alert" class="mt-6 hidden border border-[var(--color-red-stamp)] bg-[color-mix(in_srgb,#f4d6d1_50%,transparent)] text-[var(--color-red-stamp)] font-mono text-xs uppercase tracking-[0.14em] p-3 rounded-sm"></div>
+    </div>
+
+    <aside class="space-y-5">
+      <div class="card p-5">
+        <div class="section-num">Local runtime</div>
+        <h3 class="font-display text-[22px] mt-1 leading-tight">What's running.</h3>
+        <ul class="mt-3 text-sm space-y-2 font-mono">
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Rasterizer</span><span>PDF.js</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Re-encoder</span><span>Canvas → JPEG</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Network</span><span class="text-[var(--color-emerald-dk)]">idle</span></li>
+        </ul>
+      </div>
+      <AdSlot position="compress-sidebar" size="300x250" />
+      <div class="card-ink p-5">
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase opacity-80">Good to know</div>
+        <p class="mt-2 text-[15px] leading-relaxed">
+          Compression flattens pages to images. Selectable text becomes <em class="font-display not-italic">visual</em> text. Perfect for scans and receipts; avoid for contracts that need OCR.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script>
+  import { PDFDocument } from 'pdf-lib';
+  import { formatBytes, downloadBlob } from '../../lib/format.ts';
+  import { loadPdfjs } from '../../lib/pdfjs-loader.ts';
+
+  const dropzone = document.getElementById('dropzone') as HTMLDivElement;
+  const input    = document.getElementById('file-input') as HTMLInputElement;
+  const browse   = document.getElementById('browse') as HTMLButtonElement;
+  const chooseNew= document.getElementById('choose-new') as HTMLButtonElement;
+  const panel    = document.getElementById('doc-panel') as HTMLDivElement;
+  const docName  = document.getElementById('doc-name') as HTMLDivElement;
+  const docMeta  = document.getElementById('doc-meta') as HTMLDivElement;
+  const btn      = document.getElementById('compress-btn') as HTMLButtonElement;
+  const progBar  = document.getElementById('progress-bar') as HTMLSpanElement;
+  const progNum  = document.getElementById('progress-num') as HTMLSpanElement;
+  const statusLabel = document.getElementById('status-label') as HTMLSpanElement;
+  const errEl    = document.getElementById('err') as HTMLDivElement;
+  const result   = document.getElementById('result') as HTMLDivElement;
+  const rBefore  = document.getElementById('r-before') as HTMLDivElement;
+  const rAfter   = document.getElementById('r-after') as HTMLDivElement;
+  const rSaved   = document.getElementById('r-saved') as HTMLDivElement;
+  const rBar     = document.getElementById('r-bar') as HTMLSpanElement;
+  const rMeta    = document.getElementById('r-meta') as HTMLParagraphElement;
+  const scan     = dropzone.querySelector('[data-scanline]') as HTMLDivElement;
+
+  let currentFile: File | null = null;
+
+  const presets = {
+    light:  { scale: 1.8, quality: 0.85, label: 'Light' },
+    medium: { scale: 1.4, quality: 0.72, label: 'Medium' },
+    heavy:  { scale: 1.0, quality: 0.55, label: 'Heavy' },
+  } as const;
+
+  function showErr(msg: string) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 6000);
+  }
+  function setProgress(pct: number, label?: string) {
+    const c = Math.max(0, Math.min(100, pct));
+    progBar.style.width = `${c}%`;
+    progNum.textContent = `${Math.round(c)}%`;
+    if (label) statusLabel.textContent = label;
+  }
+
+  dropzone.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'browse') return;
+    input.click();
+  });
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  browse.addEventListener('click', (e) => { e.stopPropagation(); input.click(); });
+  chooseNew.addEventListener('click', () => input.click());
+  ['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('is-dragging');
+    if (scan) scan.hidden = false;
+  }));
+  ['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    if (evt === 'dragleave' && (e.target !== dropzone)) return;
+    dropzone.classList.remove('is-dragging');
+    if (scan) scan.hidden = true;
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) handleFile(f);
+    input.value = '';
+  });
+
+  async function handleFile(f: File) {
+    if (!(f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))) {
+      showErr('Only PDF files are accepted.');
+      return;
+    }
+    currentFile = f;
+    panel.classList.remove('hidden');
+    result.classList.add('hidden');
+    docName.textContent = f.name;
+    docMeta.textContent = `${formatBytes(f.size)} · reading…`;
+    btn.disabled = true;
+    try {
+      const buf = await f.arrayBuffer();
+      const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+      docMeta.textContent = `${formatBytes(f.size)} · ${doc.getPageCount()} page${doc.getPageCount()===1?'':'s'}`;
+      btn.disabled = false;
+    } catch (e) {
+      showErr('Could not open this PDF. It may be password-protected or corrupt.');
+      docMeta.textContent = `${formatBytes(f.size)} · unreadable`;
+    }
+  }
+
+  btn.addEventListener('click', async () => {
+    if (!currentFile) return;
+    btn.disabled = true;
+    result.classList.add('hidden');
+    try {
+      const preset = (document.querySelector<HTMLInputElement>('input[name="level"]:checked')?.value) as keyof typeof presets;
+      const { scale, quality } = presets[preset];
+      setProgress(2, `Rasterizing · ${presets[preset].label}`);
+
+      const srcBytes = await currentFile.arrayBuffer();
+      const pdfjs = await loadPdfjs();
+      const doc = await pdfjs.getDocument({ data: srcBytes.slice(0) }).promise;
+      const out = await PDFDocument.create();
+      out.setProducer('DontTouchMyDoc (local)');
+      out.setCreator('DontTouchMyDoc');
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('Canvas context unavailable');
+
+      for (let i = 1; i <= doc.numPages; i++) {
+        setProgress(2 + (i / doc.numPages) * 90, `Page ${i} / ${doc.numPages}`);
+        const page = await doc.getPage(i);
+        const baseVp = page.getViewport({ scale: 1 });
+        const v = page.getViewport({ scale });
+        canvas.width = Math.max(1, Math.floor(v.width));
+        canvas.height = Math.max(1, Math.floor(v.height));
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport: v }).promise;
+        const jpegBlob: Blob = await new Promise((resolve, reject) => {
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas export failed')), 'image/jpeg', quality);
+        });
+        const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+        const image = await out.embedJpg(jpegBytes);
+        const pdfPage = out.addPage([baseVp.width, baseVp.height]);
+        pdfPage.drawImage(image, { x: 0, y: 0, width: baseVp.width, height: baseVp.height });
+      }
+
+      setProgress(94, 'Writing output');
+      const bytes = await out.save({ useObjectStreams: true });
+      setProgress(100, 'Done');
+
+      const before = currentFile.size;
+      const after  = bytes.byteLength;
+      const saved  = Math.max(0, before - after);
+      const pct    = before ? (saved / before) * 100 : 0;
+
+      rBefore.textContent = formatBytes(before);
+      rAfter.textContent  = formatBytes(after);
+      rSaved.textContent  = `${pct.toFixed(0)}%`;
+      rBar.style.width    = `${Math.min(100, pct)}%`;
+      rMeta.textContent   = pct > 0
+        ? `Saved ${formatBytes(saved)} · preset: ${presets[preset].label}`
+        : `Already compact — no meaningful gains at the "${presets[preset].label}" preset. Try Heavy.`;
+      result.classList.remove('hidden');
+
+      const base = currentFile.name.replace(/\.pdf$/i, '') || 'document';
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${base}-compressed.pdf`);
+
+      setTimeout(() => setProgress(0, 'Idle'), 1500);
+    } catch (err) {
+      console.error(err);
+      showErr('Couldn\'t compress this PDF. It may be password-protected or corrupt.');
+      setProgress(0, 'Idle');
+    } finally {
+      btn.disabled = !currentFile;
+    }
+  });
+</script>

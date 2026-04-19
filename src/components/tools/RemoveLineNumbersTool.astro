@@ -1,0 +1,477 @@
+---
+// Client-side line-number remover for court transcripts and similar documents.
+// Detects digit-only text items in the leftmost margin, then whites out their
+// bounding boxes via pdf-lib. Scanned PDFs (no extractable text) are rejected.
+import AdSlot from '../AdSlot.astro';
+---
+<section id="tool" class="mx-auto max-w-[1320px] px-5 sm:px-8 pt-10 pb-16">
+  <div class="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+    <div>
+      <!-- Drop zone -->
+      <div
+        id="dropzone"
+        class="drop-target relative rounded-sm p-10 md:p-14 text-center cursor-pointer"
+        role="button"
+        tabindex="0"
+        aria-label="Drop a PDF here or click to browse"
+      >
+        <div class="scanline rounded-sm" data-scanline hidden></div>
+        <div class="relative">
+          <div class="mx-auto w-14 h-14 inline-flex items-center justify-center rounded-sm bg-[var(--color-ink)] text-[var(--color-paper)]">
+            <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h3M3 12h3M3 18h3M10 6h11M10 12h11M10 18h11"/></svg>
+          </div>
+          <h2 class="mt-5 display-3">Drop the transcript here.</h2>
+          <p class="mt-2 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">
+            Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse</button>.
+            Works on text-based PDFs — court transcripts, legislative drafts, annotated editions.
+          </p>
+          <p class="mt-3 font-mono text-[11px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">
+            No OCR · no uploads · text-based PDFs only
+          </p>
+        </div>
+        <input id="file-input" type="file" accept="application/pdf,.pdf" class="sr-only" />
+      </div>
+
+      <!-- Doc panel -->
+      <div id="doc-panel" class="mt-6 hidden">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="shrink-0 w-10 h-12 border border-[var(--color-rule)] rounded-sm flex items-center justify-center font-display text-[14px] bg-[var(--color-paper)]">PDF</span>
+              <div class="min-w-0">
+                <div id="doc-name" class="font-display text-[22px] truncate">document.pdf</div>
+                <div id="doc-meta" class="font-mono text-[11px] uppercase tracking-[0.14em] text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">—</div>
+              </div>
+            </div>
+            <button id="choose-new" class="btn btn-ghost !py-2 !px-3">Swap file</button>
+          </div>
+
+          <!-- Detection summary -->
+          <div id="detect-summary" class="mt-6 grid sm:grid-cols-3 gap-4 hidden">
+            <div class="border border-[var(--color-rule)] rounded-sm p-4">
+              <div class="kicker">Detected</div>
+              <div id="d-total" class="font-display text-[34px] leading-none mt-1">—</div>
+              <div class="mt-1 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">line numbers</div>
+            </div>
+            <div class="border border-[var(--color-rule)] rounded-sm p-4">
+              <div class="kicker">Coverage</div>
+              <div id="d-pages" class="font-display text-[34px] leading-none mt-1">—</div>
+              <div class="mt-1 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">pages affected</div>
+            </div>
+            <div class="border border-[var(--color-rule)] rounded-sm p-4">
+              <div class="kicker">Left margin</div>
+              <div id="d-margin" class="font-display text-[34px] leading-none mt-1 text-[var(--color-emerald-dk)]">—</div>
+              <div class="mt-1 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">search column (pt)</div>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="mt-6 grid sm:grid-cols-2 gap-4">
+            <label class="flex items-start gap-3 p-4 rounded-sm border border-[var(--color-rule)] cursor-pointer has-[:checked]:border-[var(--color-emerald-dk)] has-[:checked]:bg-[var(--color-emerald-lt)]">
+              <input type="checkbox" id="opt-trailing-dot" class="mt-1" checked />
+              <div>
+                <div class="font-mono text-[11px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">Option 01</div>
+                <div class="font-display text-[20px] leading-tight mt-0.5">Strip trailing dots</div>
+                <div class="mt-1 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">Also remove <span class="font-mono">"1."</span> style numbering.</div>
+              </div>
+            </label>
+            <label class="flex items-start gap-3 p-4 rounded-sm border border-[var(--color-rule)] cursor-pointer has-[:checked]:border-[var(--color-emerald-dk)] has-[:checked]:bg-[var(--color-emerald-lt)]">
+              <input type="checkbox" id="opt-wide-margin" class="mt-1" />
+              <div>
+                <div class="font-mono text-[11px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">Option 02</div>
+                <div class="font-display text-[20px] leading-tight mt-0.5">Wider search column</div>
+                <div class="mt-1 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">For transcripts with a larger left gutter.</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rule pt-5">
+            <div class="flex-1 min-w-[240px]">
+              <div class="flex items-center justify-between mb-1.5 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+                <span id="status-label">Idle</span>
+                <span id="progress-num">0%</span>
+              </div>
+              <div class="bar"><span id="progress-bar" style="width:0%"></span></div>
+            </div>
+            <button id="run-btn" class="btn btn-primary" disabled>
+              Remove &amp; download
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v14M6 11l6 6 6-6M5 21h14"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-3">
+            <div class="section-num">Preview · page 1</div>
+            <div id="preview-note" class="font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">rendering locally…</div>
+          </div>
+          <div class="card p-4">
+            <div id="preview" class="relative w-full max-w-[520px] mx-auto">
+              <canvas id="preview-canvas" class="block w-full rounded-sm border border-[var(--color-rule)] bg-white"></canvas>
+              <svg id="preview-overlay" class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+            </div>
+            <p class="mt-3 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)] text-center">
+              <span class="inline-block w-3 h-3 align-middle mr-1 bg-[color-mix(in_srgb,var(--color-red-stamp)_30%,transparent)] border border-[var(--color-red-stamp)]"></span>
+              markers show what will be whited-out
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div id="result" class="mt-6 card p-6 hidden">
+        <div class="flex items-center justify-between">
+          <div class="section-num">Result</div>
+          <span class="stamp">Redacted · Locally</span>
+        </div>
+        <div class="mt-4 grid sm:grid-cols-3 gap-4">
+          <div>
+            <div class="kicker">Line numbers removed</div>
+            <div id="r-removed" class="font-display text-[34px] leading-none mt-1 text-[var(--color-emerald-dk)]">—</div>
+          </div>
+          <div>
+            <div class="kicker">Pages touched</div>
+            <div id="r-pages" class="font-display text-[34px] leading-none mt-1">—</div>
+          </div>
+          <div>
+            <div class="kicker">Output</div>
+            <div id="r-size" class="font-display text-[34px] leading-none mt-1">—</div>
+          </div>
+        </div>
+        <p id="r-meta" class="mt-3 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">—</p>
+      </div>
+
+      <!-- Warning area (scanned / nothing detected) -->
+      <div id="warn" class="mt-6 hidden border border-[var(--color-amber)] bg-[color-mix(in_srgb,var(--color-amber)_12%,var(--color-cream))] text-[var(--color-amber)] p-4 rounded-sm">
+        <div class="font-mono text-[11px] tracking-[0.18em] uppercase">Heads up</div>
+        <p id="warn-msg" class="mt-1 text-[15px] text-[var(--color-ink)] leading-relaxed"></p>
+      </div>
+
+      <div id="err" role="alert" class="mt-6 hidden border border-[var(--color-red-stamp)] bg-[color-mix(in_srgb,#f4d6d1_50%,transparent)] text-[var(--color-red-stamp)] font-mono text-xs uppercase tracking-[0.14em] p-3 rounded-sm"></div>
+    </div>
+
+    <aside class="space-y-5">
+      <div class="card p-5">
+        <div class="section-num">Local runtime</div>
+        <h3 class="font-display text-[22px] mt-1 leading-tight">What's running.</h3>
+        <ul class="mt-3 text-sm space-y-2 font-mono">
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Detector</span><span>PDF.js text layer</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Redactor</span><span>pdf-lib whiteout</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">OCR</span><span class="text-[var(--color-red-stamp)]">none · by design</span></li>
+        </ul>
+      </div>
+      <AdSlot position="remove-lines-sidebar" size="300x250" />
+      <div class="card-ink p-5">
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase opacity-80">Good to know</div>
+        <p class="mt-2 text-[15px] leading-relaxed">
+          The <em class="font-display not-italic">vertical rule</em> between numbers and text (common on court transcripts) is a path, not text — we leave it alone to avoid damaging the rest of the page.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script>
+  import { PDFDocument, rgb } from 'pdf-lib';
+  import { formatBytes, downloadBlob } from '../../lib/format.ts';
+  import { loadPdfjs } from '../../lib/pdfjs-loader.ts';
+
+  type Rect = { x: number; y: number; width: number; height: number };
+  type PageDetection = {
+    pageIndex: number;
+    rects: Rect[];
+    pageWidth: number;
+    pageHeight: number;
+  };
+
+  const dropzone  = document.getElementById('dropzone') as HTMLDivElement;
+  const input     = document.getElementById('file-input') as HTMLInputElement;
+  const browse    = document.getElementById('browse') as HTMLButtonElement;
+  const chooseNew = document.getElementById('choose-new') as HTMLButtonElement;
+  const panel     = document.getElementById('doc-panel') as HTMLDivElement;
+  const docName   = document.getElementById('doc-name') as HTMLDivElement;
+  const docMeta   = document.getElementById('doc-meta') as HTMLDivElement;
+  const summary   = document.getElementById('detect-summary') as HTMLDivElement;
+  const dTotal    = document.getElementById('d-total') as HTMLDivElement;
+  const dPages    = document.getElementById('d-pages') as HTMLDivElement;
+  const dMargin   = document.getElementById('d-margin') as HTMLDivElement;
+  const previewNote   = document.getElementById('preview-note') as HTMLDivElement;
+  const canvas    = document.getElementById('preview-canvas') as HTMLCanvasElement;
+  const overlay   = document.getElementById('preview-overlay') as SVGSVGElement;
+  const btn       = document.getElementById('run-btn') as HTMLButtonElement;
+  const progBar   = document.getElementById('progress-bar') as HTMLSpanElement;
+  const progNum   = document.getElementById('progress-num') as HTMLSpanElement;
+  const statusLabel = document.getElementById('status-label') as HTMLSpanElement;
+  const errEl     = document.getElementById('err') as HTMLDivElement;
+  const warnEl    = document.getElementById('warn') as HTMLDivElement;
+  const warnMsg   = document.getElementById('warn-msg') as HTMLParagraphElement;
+  const resultEl  = document.getElementById('result') as HTMLDivElement;
+  const rRemoved  = document.getElementById('r-removed') as HTMLDivElement;
+  const rPages    = document.getElementById('r-pages') as HTMLDivElement;
+  const rSize     = document.getElementById('r-size') as HTMLDivElement;
+  const rMeta     = document.getElementById('r-meta') as HTMLParagraphElement;
+  const optDot    = document.getElementById('opt-trailing-dot') as HTMLInputElement;
+  const optWide   = document.getElementById('opt-wide-margin') as HTMLInputElement;
+  const scan      = dropzone.querySelector('[data-scanline]') as HTMLDivElement;
+
+  let currentFile: File | null = null;
+  let detections: PageDetection[] = [];
+
+  function showErr(msg: string) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 6000);
+  }
+  function showWarn(msg: string) {
+    warnMsg.textContent = msg;
+    warnEl.classList.remove('hidden');
+  }
+  function hideWarn() { warnEl.classList.add('hidden'); }
+  function setProgress(pct: number, label?: string) {
+    const c = Math.max(0, Math.min(100, pct));
+    progBar.style.width = `${c}%`;
+    progNum.textContent = `${Math.round(c)}%`;
+    if (label) statusLabel.textContent = label;
+  }
+
+  // Drop zone wiring
+  dropzone.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'browse') return;
+    input.click();
+  });
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  browse.addEventListener('click', (e) => { e.stopPropagation(); input.click(); });
+  chooseNew.addEventListener('click', () => input.click());
+  ['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('is-dragging');
+    if (scan) scan.hidden = false;
+  }));
+  ['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    if (evt === 'dragleave' && (e.target !== dropzone)) return;
+    dropzone.classList.remove('is-dragging');
+    if (scan) scan.hidden = true;
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) handleFile(f);
+    input.value = '';
+  });
+  optDot.addEventListener('change', () => { if (currentFile) detect(); });
+  optWide.addEventListener('change', () => { if (currentFile) detect(); });
+
+  async function handleFile(f: File) {
+    if (!(f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))) {
+      showErr('Only PDF files are accepted.'); return;
+    }
+    currentFile = f;
+    hideWarn();
+    resultEl.classList.add('hidden');
+    panel.classList.remove('hidden');
+    docName.textContent = f.name;
+    docMeta.textContent = `${formatBytes(f.size)} · reading…`;
+    summary.classList.add('hidden');
+    btn.disabled = true;
+    await detect();
+  }
+
+  async function detect() {
+    if (!currentFile) return;
+    btn.disabled = true;
+    previewNote.textContent = 'analysing locally…';
+    try {
+      const bytes = await currentFile.arrayBuffer();
+      const pdfjs = await loadPdfjs();
+      const doc = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
+      docMeta.textContent = `${formatBytes(currentFile.size)} · ${doc.numPages} page${doc.numPages===1?'':'s'}`;
+
+      const allowDot  = optDot.checked;
+      const wide      = optWide.checked;
+      const marginPts = wide ? 80 : 50;
+
+      detections = [];
+      let totalTextItems = 0;
+      for (let i = 1; i <= doc.numPages; i++) {
+        const page = await doc.getPage(i);
+        const vp   = page.getViewport({ scale: 1 });
+        const tc   = await page.getTextContent();
+        totalTextItems += tc.items.length;
+        const items = tc.items
+          .filter((it: any) => typeof it.str === 'string' && it.transform)
+          .map((it: any) => {
+            const str: string = it.str.trim();
+            const tx = it.transform[4] as number;
+            const ty = it.transform[5] as number;
+            const width  = it.width  as number;
+            const height = it.height as number;
+            return { str, tx, ty, width, height };
+          });
+
+        if (!items.length) {
+          detections.push({ pageIndex: i - 1, rects: [], pageWidth: vp.width, pageHeight: vp.height });
+          continue;
+        }
+
+        const digitRe = allowDot ? /^\d{1,3}\.?$/ : /^\d{1,3}$/;
+        const candidates = items.filter((it) => digitRe.test(it.str));
+        if (candidates.length < 3) {
+          detections.push({ pageIndex: i - 1, rects: [], pageWidth: vp.width, pageHeight: vp.height });
+          continue;
+        }
+
+        // Find the leftmost cluster: take the min X of all text items,
+        // then keep candidates whose X is within `marginPts` of that min.
+        const pageMinX = Math.min(...items.map((it) => it.tx));
+        const leftCandidates = candidates.filter((it) => it.tx <= pageMinX + marginPts);
+        if (leftCandidates.length < 3) {
+          detections.push({ pageIndex: i - 1, rects: [], pageWidth: vp.width, pageHeight: vp.height });
+          continue;
+        }
+
+        // Validate a consistent X column: require that ≥70% of candidates
+        // fall within a 10pt-wide vertical strip.
+        const xs = leftCandidates.map((it) => it.tx).sort((a, b) => a - b);
+        const medianX = xs[Math.floor(xs.length / 2)];
+        const inColumn = leftCandidates.filter((it) => Math.abs(it.tx - medianX) <= 10);
+        if (inColumn.length < 3 || inColumn.length / leftCandidates.length < 0.7) {
+          detections.push({ pageIndex: i - 1, rects: [], pageWidth: vp.width, pageHeight: vp.height });
+          continue;
+        }
+
+        const rects: Rect[] = inColumn.map((it) => ({
+          x: Math.max(0, it.tx - 1.5),
+          // pdf-lib uses bottom-origin; PDF.js gives us ty at baseline in user space.
+          y: Math.max(0, it.ty - 1.5),
+          width: Math.max(it.width, 1) + 3,
+          height: Math.max(it.height, 8) + 3,
+        }));
+        detections.push({ pageIndex: i - 1, rects, pageWidth: vp.width, pageHeight: vp.height });
+      }
+
+      const total        = detections.reduce((a, d) => a + d.rects.length, 0);
+      const pagesAffected = detections.filter((d) => d.rects.length).length;
+      dTotal.textContent  = `${total}`;
+      dPages.textContent  = `${pagesAffected} / ${doc.numPages}`;
+      dMargin.textContent = `${marginPts}`;
+      summary.classList.remove('hidden');
+
+      if (totalTextItems === 0) {
+        showWarn('This looks like a scanned PDF — there\'s no extractable text. This tool needs a text-based PDF; scanned ones would require OCR, which we don\'t run (by design). Try compressing the scan elsewhere, or OCR it in your PDF viewer first.');
+        btn.disabled = true;
+      } else if (total === 0) {
+        showWarn('No line numbers detected. If you can see them on the page, try the "wider search column" option, or this may be a scanned page where numbers aren\'t extractable as text.');
+        btn.disabled = true;
+      } else {
+        hideWarn();
+        btn.disabled = false;
+      }
+
+      await renderPreview(bytes);
+    } catch (err) {
+      console.error(err);
+      showErr('Could not open this PDF. It may be password-protected or corrupt.');
+    }
+  }
+
+  async function renderPreview(bytes: ArrayBuffer) {
+    const pdfjs = await loadPdfjs();
+    const doc = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
+    const page = await doc.getPage(1);
+    const vp   = page.getViewport({ scale: 1 });
+    const scale = Math.min(520 / vp.width, 760 / vp.height);
+    const v    = page.getViewport({ scale });
+    const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = Math.floor(v.width * dpr);
+    canvas.height = Math.floor(v.height * dpr);
+    canvas.style.aspectRatio = `${v.width} / ${v.height}`;
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    await page.render({ canvasContext: ctx, viewport: v }).promise;
+    previewNote.textContent = 'rendered locally';
+
+    // Draw overlay rectangles in user-space coordinates → scale to viewBox 0..100
+    overlay.setAttribute('viewBox', `0 0 ${vp.width} ${vp.height}`);
+    overlay.setAttribute('preserveAspectRatio', 'none');
+    overlay.innerHTML = '';
+    const firstPage = detections[0];
+    if (firstPage) {
+      for (const r of firstPage.rects) {
+        // overlay uses SVG top-origin; convert from PDF bottom-origin
+        const svgY = firstPage.pageHeight - r.y - r.height;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String(r.x));
+        rect.setAttribute('y', String(svgY));
+        rect.setAttribute('width', String(r.width));
+        rect.setAttribute('height', String(r.height));
+        rect.setAttribute('fill', 'color-mix(in srgb, var(--color-red-stamp) 30%, transparent)');
+        rect.setAttribute('stroke', 'var(--color-red-stamp)');
+        rect.setAttribute('stroke-width', '0.5');
+        overlay.appendChild(rect);
+      }
+    }
+  }
+
+  btn.addEventListener('click', async () => {
+    if (!currentFile) return;
+    btn.disabled = true;
+    resultEl.classList.add('hidden');
+    try {
+      setProgress(2, 'Loading document');
+      const bytes = await currentFile.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      pdfDoc.setProducer('DontTouchMyDoc (local)');
+      pdfDoc.setCreator('DontTouchMyDoc');
+      const pages = pdfDoc.getPages();
+
+      let totalRemoved = 0;
+      let pagesTouched = 0;
+      for (let i = 0; i < detections.length; i++) {
+        setProgress(2 + (i / detections.length) * 94, `Page ${i + 1} / ${detections.length}`);
+        const det = detections[i];
+        if (!det.rects.length) continue;
+        const page = pages[det.pageIndex];
+        for (const r of det.rects) {
+          page.drawRectangle({
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+            color: rgb(1, 1, 1),
+            borderWidth: 0,
+          });
+        }
+        totalRemoved += det.rects.length;
+        pagesTouched += 1;
+      }
+
+      setProgress(96, 'Writing output');
+      const out = await pdfDoc.save({ useObjectStreams: true });
+      setProgress(100, 'Done');
+
+      const base = currentFile.name.replace(/\.pdf$/i, '') || 'document';
+      downloadBlob(new Blob([out], { type: 'application/pdf' }), `${base}-no-line-numbers.pdf`);
+
+      rRemoved.textContent = `${totalRemoved}`;
+      rPages.textContent   = `${pagesTouched}`;
+      rSize.textContent    = formatBytes(out.byteLength);
+      rMeta.textContent    = `Output saved · ${base}-no-line-numbers.pdf`;
+      resultEl.classList.remove('hidden');
+
+      setTimeout(() => setProgress(0, 'Idle'), 1500);
+    } catch (err) {
+      console.error(err);
+      showErr('Couldn\'t process this PDF. It may be password-protected or corrupt.');
+      setProgress(0, 'Idle');
+    } finally {
+      btn.disabled = !currentFile;
+    }
+  });
+</script>

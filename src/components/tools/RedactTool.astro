@@ -1,0 +1,480 @@
+---
+// Client-side PDF redactor. Click-and-drag black boxes over sensitive content.
+// On save, pages WITH redactions are rasterized (via PDF.js) with the boxes
+// painted onto the canvas, then re-embedded as images — so the underlying
+// text is genuinely destroyed, not just visually hidden. Pages WITHOUT
+// redactions are copied as-is to preserve quality.
+import AdSlot from '../AdSlot.astro';
+---
+<section id="tool" class="mx-auto max-w-[1320px] px-5 sm:px-8 pt-10 pb-16">
+  <div class="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+    <div>
+      <!-- Drop zone -->
+      <div
+        id="dropzone"
+        class="drop-target relative rounded-sm p-10 md:p-14 text-center cursor-pointer"
+        role="button"
+        tabindex="0"
+        aria-label="Drop a PDF here or click to browse"
+      >
+        <div class="scanline rounded-sm" data-scanline hidden></div>
+        <div class="relative">
+          <div class="mx-auto w-14 h-14 inline-flex items-center justify-center rounded-sm bg-[var(--color-red-stamp)] text-[var(--color-paper)]">
+            <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="18" height="6"/><path d="M3 13h18"/></svg>
+          </div>
+          <h2 class="mt-5 display-3">Drop a PDF here.</h2>
+          <p class="mt-2 text-sm text-[color-mix(in_srgb,var(--color-ink)_75%,transparent)]">
+            Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse</button>.
+            Click-and-drag black boxes over anything sensitive. The text underneath is genuinely destroyed in the output.
+          </p>
+        </div>
+        <input id="file-input" type="file" accept="application/pdf,.pdf" class="sr-only" />
+      </div>
+
+      <!-- Workspace -->
+      <div id="workspace" class="mt-6 hidden">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="shrink-0 w-10 h-12 border border-[var(--color-rule)] rounded-sm flex items-center justify-center font-display text-[14px] bg-[var(--color-paper)]">PDF</span>
+              <div class="min-w-0">
+                <div id="doc-name" class="font-display text-[22px] truncate">document.pdf</div>
+                <div id="doc-meta" class="font-mono text-[11px] uppercase tracking-[0.14em] text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">—</div>
+              </div>
+            </div>
+            <button id="choose-new" class="btn btn-ghost !py-2 !px-3">Swap file</button>
+          </div>
+
+          <!-- Page navigator -->
+          <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <button id="prev-page" class="btn btn-ghost !py-2 !px-3" disabled>
+                <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg>
+                Prev
+              </button>
+              <span id="page-indicator" class="font-mono text-[12px] tracking-[0.12em] uppercase px-2">Page 1 of 1</span>
+              <button id="next-page" class="btn btn-ghost !py-2 !px-3" disabled>
+                Next
+                <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="redaction-count" class="chip">0 redactions</span>
+              <button id="clear-page" class="btn btn-ghost !py-2 !px-3" title="Clear redactions on this page">Clear page</button>
+              <button id="clear-all" class="btn btn-ghost !py-2 !px-3 text-[var(--color-red-stamp)] border-[var(--color-red-stamp)] hover:bg-[var(--color-red-stamp)] hover:text-[var(--color-paper)]">Clear all</button>
+            </div>
+          </div>
+
+          <!-- Canvas workspace -->
+          <div class="mt-4 relative">
+            <div id="canvas-wrap" class="relative mx-auto bg-white border border-[var(--color-rule)] rounded-sm select-none touch-none" style="cursor: crosshair;">
+              <canvas id="page-canvas" class="block w-full h-auto"></canvas>
+              <svg id="redact-overlay" class="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none"></svg>
+            </div>
+            <p class="mt-3 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)] text-center">
+              click &amp; drag to draw · click a box to remove it
+            </p>
+          </div>
+
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rule pt-5">
+            <div class="flex-1 min-w-[240px]">
+              <div class="flex items-center justify-between mb-1.5 font-mono text-[11px] tracking-[0.12em] uppercase text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+                <span id="status-label">Idle</span>
+                <span id="progress-num">0%</span>
+              </div>
+              <div class="bar"><span id="progress-bar" style="width:0%"></span></div>
+            </div>
+            <button id="save-btn" class="btn btn-primary" disabled>
+              Apply &amp; download
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v14M6 11l6 6 6-6M5 21h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="err" role="alert" class="mt-6 hidden border border-[var(--color-red-stamp)] bg-[color-mix(in_srgb,#f4d6d1_50%,transparent)] text-[var(--color-red-stamp)] font-mono text-xs uppercase tracking-[0.14em] p-3 rounded-sm"></div>
+    </div>
+
+    <aside class="space-y-5">
+      <div class="card p-5">
+        <div class="section-num">Local runtime</div>
+        <h3 class="font-display text-[22px] mt-1 leading-tight">What's running.</h3>
+        <ul class="mt-3 text-sm space-y-2 font-mono">
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Renderer</span><span>PDF.js</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Flattener</span><span>Canvas → JPEG</span></li>
+          <li class="flex justify-between gap-4"><span class="text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">Text removal</span><span class="text-[var(--color-emerald-dk)]">genuine</span></li>
+        </ul>
+      </div>
+      <AdSlot position="redact-sidebar" size="300x250" />
+      <div class="card-ink p-5">
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase opacity-80">How it works</div>
+        <p class="mt-2 text-[15px] leading-relaxed">
+          Pages with boxes get <em class="font-display not-italic">flattened</em> to images before saving — so the text beneath a redaction is <em class="font-display not-italic">gone</em>, not just covered. Pages without boxes stay pixel-perfect.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script>
+  import { PDFDocument } from 'pdf-lib';
+  import { formatBytes, downloadBlob } from '../../lib/format.ts';
+  import { loadPdfjs } from '../../lib/pdfjs-loader.ts';
+
+  // Rectangles stored per page in USER SPACE (PDF coords, bottom-origin).
+  type Rect = { x: number; y: number; width: number; height: number; id: string };
+
+  const dropzone  = document.getElementById('dropzone') as HTMLDivElement;
+  const input     = document.getElementById('file-input') as HTMLInputElement;
+  const browse    = document.getElementById('browse') as HTMLButtonElement;
+  const chooseNew = document.getElementById('choose-new') as HTMLButtonElement;
+  const workspace = document.getElementById('workspace') as HTMLDivElement;
+  const docName   = document.getElementById('doc-name') as HTMLDivElement;
+  const docMeta   = document.getElementById('doc-meta') as HTMLDivElement;
+  const canvas    = document.getElementById('page-canvas') as HTMLCanvasElement;
+  const overlay   = document.getElementById('redact-overlay') as SVGSVGElement;
+  const wrap      = document.getElementById('canvas-wrap') as HTMLDivElement;
+  const prevBtn   = document.getElementById('prev-page') as HTMLButtonElement;
+  const nextBtn   = document.getElementById('next-page') as HTMLButtonElement;
+  const pageInd   = document.getElementById('page-indicator') as HTMLSpanElement;
+  const redCount  = document.getElementById('redaction-count') as HTMLSpanElement;
+  const clearPageBtn = document.getElementById('clear-page') as HTMLButtonElement;
+  const clearAllBtn  = document.getElementById('clear-all') as HTMLButtonElement;
+  const saveBtn   = document.getElementById('save-btn') as HTMLButtonElement;
+  const progBar   = document.getElementById('progress-bar') as HTMLSpanElement;
+  const progNum   = document.getElementById('progress-num') as HTMLSpanElement;
+  const statusLbl = document.getElementById('status-label') as HTMLSpanElement;
+  const errEl     = document.getElementById('err') as HTMLDivElement;
+  const scan      = dropzone.querySelector('[data-scanline]') as HTMLDivElement;
+
+  let currentFile: File | null = null;
+  let pdfjsDoc: any | null = null;
+  let currentPage = 1;
+  let pageWidth = 0;
+  let pageHeight = 0;
+  const redactions: Map<number, Rect[]> = new Map();
+
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function showErr(msg: string) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 6000);
+  }
+  function setProgress(pct: number, label?: string) {
+    const c = Math.max(0, Math.min(100, pct));
+    progBar.style.width = `${c}%`;
+    progNum.textContent = `${Math.round(c)}%`;
+    if (label) statusLbl.textContent = label;
+  }
+
+  // --- Drop zone wiring ---
+  dropzone.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'browse') return;
+    input.click();
+  });
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  browse.addEventListener('click', (e) => { e.stopPropagation(); input.click(); });
+  chooseNew.addEventListener('click', () => input.click());
+  ['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('is-dragging');
+    if (scan) scan.hidden = false;
+  }));
+  ['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    if (evt === 'dragleave' && (e.target !== dropzone)) return;
+    dropzone.classList.remove('is-dragging');
+    if (scan) scan.hidden = true;
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) handleFile(f);
+    input.value = '';
+  });
+
+  async function handleFile(f: File) {
+    if (!(f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))) {
+      showErr('Only PDF files are accepted.'); return;
+    }
+    currentFile = f;
+    redactions.clear();
+    workspace.classList.remove('hidden');
+    docName.textContent = f.name;
+    docMeta.textContent = `${formatBytes(f.size)} · loading…`;
+    saveBtn.disabled = true;
+
+    try {
+      const bytes = await f.arrayBuffer();
+      const pdfjs = await loadPdfjs();
+      pdfjsDoc = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
+      docMeta.textContent = `${formatBytes(f.size)} · ${pdfjsDoc.numPages} page${pdfjsDoc.numPages===1?'':'s'}`;
+      currentPage = 1;
+      await showPage(currentPage);
+      updateButtons();
+    } catch (err) {
+      console.error(err);
+      showErr('Could not open this PDF. It may be password-protected or corrupt.');
+    }
+  }
+
+  async function showPage(n: number) {
+    if (!pdfjsDoc) return;
+    const page = await pdfjsDoc.getPage(n);
+    const vp   = page.getViewport({ scale: 1 });
+    pageWidth  = vp.width;
+    pageHeight = vp.height;
+    // Scale to fit the container width — responsive.
+    const containerWidth = Math.min(wrap.clientWidth || 900, 900);
+    const scale = Math.max(1, containerWidth / vp.width);
+    const v    = page.getViewport({ scale });
+    const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = Math.floor(v.width * dpr);
+    canvas.height = Math.floor(v.height * dpr);
+    canvas.style.aspectRatio = `${v.width} / ${v.height}`;
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, v.width, v.height);
+    await page.render({ canvasContext: ctx, viewport: v }).promise;
+
+    overlay.setAttribute('viewBox', `0 0 ${vp.width} ${vp.height}`);
+    overlay.setAttribute('preserveAspectRatio', 'none');
+    redrawOverlay();
+    pageInd.textContent = `Page ${n} of ${pdfjsDoc.numPages}`;
+    updateRedactionCount();
+  }
+
+  function updateButtons() {
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = !pdfjsDoc || currentPage >= pdfjsDoc.numPages;
+    const total = Array.from(redactions.values()).reduce((a, arr) => a + arr.length, 0);
+    saveBtn.disabled = total === 0 || !currentFile;
+  }
+
+  function updateRedactionCount() {
+    const onPage = redactions.get(currentPage) ?? [];
+    redCount.textContent = `${onPage.length} on page · ${
+      Array.from(redactions.values()).reduce((a, arr) => a + arr.length, 0)
+    } total`;
+  }
+
+  prevBtn.addEventListener('click', async () => {
+    if (currentPage <= 1) return;
+    currentPage--;
+    await showPage(currentPage);
+    updateButtons();
+  });
+  nextBtn.addEventListener('click', async () => {
+    if (!pdfjsDoc || currentPage >= pdfjsDoc.numPages) return;
+    currentPage++;
+    await showPage(currentPage);
+    updateButtons();
+  });
+  clearPageBtn.addEventListener('click', () => {
+    redactions.delete(currentPage);
+    redrawOverlay();
+    updateRedactionCount();
+    updateButtons();
+  });
+  clearAllBtn.addEventListener('click', () => {
+    redactions.clear();
+    redrawOverlay();
+    updateRedactionCount();
+    updateButtons();
+  });
+
+  // --- Drawing redactions ---
+  // Coordinates: mouse → canvas px → user-space (bottom-origin).
+  function toUserSpace(clientX: number, clientY: number): { x: number; y: number } {
+    const r = wrap.getBoundingClientRect();
+    const xPx = clientX - r.left;
+    const yPx = clientY - r.top;
+    // user-space X grows with canvas X; user-space Y grows UP while canvas Y grows DOWN.
+    const x = (xPx / r.width) * pageWidth;
+    const y = pageHeight - (yPx / r.height) * pageHeight;
+    return { x, y };
+  }
+
+  let dragStart: { x: number; y: number } | null = null;
+  let liveRectEl: SVGRectElement | null = null;
+
+  function onPointerDown(ev: PointerEvent) {
+    // Clicking an existing rect removes it (don't start a new drag).
+    const target = ev.target as Element;
+    if (target && target !== overlay && target.closest && target.closest('rect[data-redact]')) {
+      const el = target.closest('rect[data-redact]') as SVGRectElement;
+      const id = el.getAttribute('data-id')!;
+      const arr = redactions.get(currentPage) ?? [];
+      const filtered = arr.filter((r) => r.id !== id);
+      if (filtered.length) redactions.set(currentPage, filtered);
+      else redactions.delete(currentPage);
+      redrawOverlay();
+      updateRedactionCount();
+      updateButtons();
+      return;
+    }
+    (wrap as HTMLElement).setPointerCapture(ev.pointerId);
+    dragStart = toUserSpace(ev.clientX, ev.clientY);
+    liveRectEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    // Slight transparency while dragging so you can see what you're about to cover.
+    liveRectEl.setAttribute('fill', 'rgba(0, 0, 0, 0.55)');
+    liveRectEl.setAttribute('stroke', '#b4271f');
+    liveRectEl.setAttribute('stroke-width', '1');
+    liveRectEl.setAttribute('stroke-dasharray', '3 2');
+    overlay.appendChild(liveRectEl);
+  }
+
+  function onPointerMove(ev: PointerEvent) {
+    if (!dragStart || !liveRectEl) return;
+    const now = toUserSpace(ev.clientX, ev.clientY);
+    const x0 = Math.min(dragStart.x, now.x);
+    const x1 = Math.max(dragStart.x, now.x);
+    const y0 = Math.min(dragStart.y, now.y);
+    const y1 = Math.max(dragStart.y, now.y);
+    // Overlay uses top-origin; convert y to SVG coords
+    const svgY = pageHeight - y1;
+    liveRectEl.setAttribute('x', String(x0));
+    liveRectEl.setAttribute('y', String(svgY));
+    liveRectEl.setAttribute('width', String(x1 - x0));
+    liveRectEl.setAttribute('height', String(y1 - y0));
+  }
+
+  function onPointerUp(ev: PointerEvent) {
+    if (!dragStart || !liveRectEl) return;
+    try { (wrap as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+    const end = toUserSpace(ev.clientX, ev.clientY);
+    const x = Math.min(dragStart.x, end.x);
+    const width = Math.abs(dragStart.x - end.x);
+    const y0 = Math.min(dragStart.y, end.y);
+    const y1 = Math.max(dragStart.y, end.y);
+    const height = y1 - y0;
+    dragStart = null;
+    if (liveRectEl.parentNode) liveRectEl.parentNode.removeChild(liveRectEl);
+    liveRectEl = null;
+    if (width < 3 || height < 3) return; // too small; probably an accidental click
+    const rect: Rect = { id: uid(), x, y: y0, width, height };
+    const arr = redactions.get(currentPage) ?? [];
+    arr.push(rect);
+    redactions.set(currentPage, arr);
+    redrawOverlay();
+    updateRedactionCount();
+    updateButtons();
+  }
+
+  function redrawOverlay() {
+    overlay.innerHTML = '';
+    const arr = redactions.get(currentPage) ?? [];
+    for (const r of arr) {
+      const svgY = pageHeight - r.y - r.height;
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      el.setAttribute('x', String(r.x));
+      el.setAttribute('y', String(svgY));
+      el.setAttribute('width', String(r.width));
+      el.setAttribute('height', String(r.height));
+      // Fully opaque in the preview to match the saved output — no text peeks through.
+      el.setAttribute('fill', '#000');
+      el.setAttribute('stroke', '#b4271f');
+      el.setAttribute('stroke-width', '0.6');
+      el.setAttribute('data-redact', '');
+      el.setAttribute('data-id', r.id);
+      el.setAttribute('style', 'pointer-events: auto; cursor: pointer;');
+      overlay.appendChild(el);
+    }
+  }
+
+  // Enable pointer events on the overlay for delete-clicks, but only on rects.
+  // pointer-events none on the <svg> + auto on rects is the cleanest way.
+  overlay.style.pointerEvents = 'none';
+  wrap.addEventListener('pointerdown', onPointerDown);
+  wrap.addEventListener('pointermove', onPointerMove);
+  wrap.addEventListener('pointerup',   onPointerUp);
+  wrap.addEventListener('pointercancel', onPointerUp);
+
+  // --- Apply & download ---
+  saveBtn.addEventListener('click', async () => {
+    if (!currentFile) return;
+    const hasAnything = Array.from(redactions.values()).some((arr) => arr.length > 0);
+    if (!hasAnything) return;
+    saveBtn.disabled = true;
+    try {
+      setProgress(2, 'Loading source');
+      const bytes = await currentFile.arrayBuffer();
+      const pdfjs = await loadPdfjs();
+      const srcPdfjs = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
+      const srcDoc   = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const out      = await PDFDocument.create();
+      out.setProducer('DontTouchMyDoc (local)');
+      out.setCreator('DontTouchMyDoc');
+
+      const flattenCanvas = document.createElement('canvas');
+      const fctx = flattenCanvas.getContext('2d', { alpha: false });
+      if (!fctx) throw new Error('Canvas unavailable');
+
+      const total = srcPdfjs.numPages;
+      for (let i = 1; i <= total; i++) {
+        setProgress(2 + (i / total) * 92, `Page ${i} / ${total}`);
+        const rects = redactions.get(i) ?? [];
+        if (!rects.length) {
+          // No redactions — copy the page byte-accurately.
+          const [copied] = await out.copyPages(srcDoc, [i - 1]);
+          out.addPage(copied);
+          continue;
+        }
+
+        // Rasterize + paint redactions in.
+        const pjsPage = await srcPdfjs.getPage(i);
+        const vp1 = pjsPage.getViewport({ scale: 1 });
+        const scale = 2.0; // ~200 DPI equivalent for good fidelity
+        const v = pjsPage.getViewport({ scale });
+        flattenCanvas.width  = Math.floor(v.width);
+        flattenCanvas.height = Math.floor(v.height);
+        fctx.setTransform(1, 0, 0, 1, 0, 0);
+        fctx.fillStyle = '#ffffff';
+        fctx.fillRect(0, 0, flattenCanvas.width, flattenCanvas.height);
+        await pjsPage.render({ canvasContext: fctx, viewport: v }).promise;
+
+        // Paint redactions — convert from user-space to canvas-space
+        fctx.fillStyle = '#000000';
+        for (const r of rects) {
+          const cx = r.x * scale;
+          const cy = (vp1.height - r.y - r.height) * scale;
+          const cw = r.width * scale;
+          const ch = r.height * scale;
+          fctx.fillRect(cx, cy, cw, ch);
+        }
+
+        const jpegBlob: Blob = await new Promise((resolve, reject) => {
+          flattenCanvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas export failed')), 'image/jpeg', 0.85);
+        });
+        const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+        const img = await out.embedJpg(jpegBytes);
+        const outPage = out.addPage([vp1.width, vp1.height]);
+        outPage.drawImage(img, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+      }
+
+      setProgress(96, 'Writing output');
+      const output = await out.save({ useObjectStreams: true });
+      setProgress(100, 'Done');
+
+      const base = currentFile.name.replace(/\.pdf$/i, '') || 'document';
+      downloadBlob(new Blob([output], { type: 'application/pdf' }), `${base}-redacted.pdf`);
+      setTimeout(() => setProgress(0, 'Idle'), 1500);
+    } catch (err) {
+      console.error(err);
+      showErr('Couldn\'t apply redactions. The PDF may be password-protected or corrupt.');
+      setProgress(0, 'Idle');
+    } finally {
+      updateButtons();
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (pdfjsDoc) { showPage(currentPage); }
+  });
+</script>

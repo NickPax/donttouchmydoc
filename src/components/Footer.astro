@@ -1,0 +1,84 @@
+---
+const year = new Date().getFullYear();
+const tools = [
+  { href: '/merge-pdf',           label: 'Merge PDF' },
+  { href: '/split-pdf',           label: 'Split PDF' },
+  { href: '/organize-pdf',        label: 'Organise pages' },
+  { href: '/compress-pdf',        label: 'Compress PDF' },
+  { href: '/redact-pdf',          label: 'Redact PDF' },
+  { href: '/remove-line-numbers', label: 'Remove line numbers' },
+];
+---
+<footer class="mt-24 border-t border-[var(--color-rule)] bg-[var(--color-paper-2)]">
+  <!-- Manifesto marquee -->
+  <div class="overflow-hidden border-b border-[var(--color-rule)]">
+    <div class="marquee py-4">
+      {Array.from({ length: 2 }).map(() => (
+        <div class="flex items-center shrink-0 pr-10">
+          {['Your docs.', 'Your device.', 'No exceptions.', 'Zero uploads.', 'Zero servers.', 'Zero watermarks.', 'Zero sign-ups.', 'Zero tracking.'].map((phrase) => (
+            <span class="flex items-center gap-6 pr-10">
+              <span class="font-display text-[38px] md:text-[54px] leading-none">{phrase}</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-emerald-dk)]"></span>
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+
+  <div class="mx-auto max-w-[1320px] px-5 sm:px-8 py-14 grid md:grid-cols-[2fr_1fr_1fr_1fr] gap-10">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="inline-flex w-7 h-7 items-center justify-center bg-[var(--color-navy-800)] text-[var(--color-paper)] rounded-sm">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <rect x="5" y="11" width="14" height="9" />
+            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+          </svg>
+        </span>
+        <span class="font-display text-xl">DontTouchMyDoc.</span>
+      </div>
+      <p class="mt-4 max-w-sm text-sm leading-relaxed text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]">
+        PDF tools that actually respect your files. Everything runs in your browser — your documents never leave your device, and never hit our servers. Because they can't. There aren't any.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <span class="chip chip-green">Client-side only</span>
+        <span class="chip">No sign-up</span>
+        <span class="chip">No watermarks</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="kicker mb-4">Tools</div>
+      <ul class="space-y-2.5">
+        {tools.map((t) => (
+          <li><a href={t.href} class="text-sm hover:underline underline-offset-4 decoration-[var(--color-emerald-dk)] decoration-2">{t.label}</a></li>
+        ))}
+      </ul>
+    </div>
+
+    <div>
+      <div class="kicker mb-4">Project</div>
+      <ul class="space-y-2.5 text-sm">
+        <li><a href="/about" class="hover:underline underline-offset-4 decoration-[var(--color-emerald-dk)] decoration-2">About</a></li>
+        <li><a href="/about#how-it-works" class="hover:underline underline-offset-4 decoration-[var(--color-emerald-dk)] decoration-2">How it works</a></li>
+        <li><a href="/about#privacy" class="hover:underline underline-offset-4 decoration-[var(--color-emerald-dk)] decoration-2">Privacy promise</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="kicker mb-4">Status</div>
+      <ul class="space-y-2.5 text-sm font-mono">
+        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-[var(--color-emerald-dk)] rounded-full"></span> all systems cold</li>
+        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-[var(--color-emerald-dk)] rounded-full"></span> 0 servers running</li>
+        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-[var(--color-emerald-dk)] rounded-full"></span> 0 files stored</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="border-t border-[var(--color-rule)]">
+    <div class="mx-auto max-w-[1320px] px-5 sm:px-8 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
+      <span>© {year} DontTouchMyDoc. Built without your files.</span>
+      <span class="tracking-[0.18em] uppercase">v0.1.0 · donttouchmydoc.com</span>
+    </div>
+  </div>
+</footer>

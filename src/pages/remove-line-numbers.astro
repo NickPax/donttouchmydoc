@@ -1,0 +1,67 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ToolHeader from '../components/ToolHeader.astro';
+import RemoveLineNumbersTool from '../components/tools/RemoveLineNumbersTool.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Faq from '../components/Faq.astro';
+import RelatedTools from '../components/RelatedTools.astro';
+import AdSlot from '../components/AdSlot.astro';
+
+const title = 'Remove line numbers from PDF — court transcripts, free · DontTouchMyDoc';
+const description = 'Strip line numbers from court transcripts, legal filings and legislative drafts. Runs entirely in your browser — your files never leave your device. Free, no sign-up.';
+
+const steps = [
+  { title: 'Open the PDF', body: "Drop a text-based PDF. We scan each page's text layer locally using PDF.js — no OCR, no uploads." },
+  { title: 'We detect numbers', body: 'Digit-only text items in the leftmost margin are flagged as line numbers. You\'ll see a preview with markers before committing.' },
+  { title: 'Download the clean file', body: 'We white out each detected number with pdf-lib, preserving everything else. The output is a regular PDF, no watermarks.' },
+];
+
+const faq = [
+  { q: 'What kinds of PDFs does this work on?', a: "Any text-based PDF with digit-only line numbers in a left-margin column. That covers most modern court transcripts, legislative drafts and academic editions. Scanned PDFs — where the numbers are part of a page image — need OCR first, which this tool doesn't do." },
+  { q: 'How can I tell if my PDF is text-based or scanned?', a: "Try to highlight and copy a line of text in your PDF viewer. If you can, it's text-based. If the whole page acts like one big image, it's a scan." },
+  { q: "Why didn't it find my line numbers?", a: "Two common causes: (1) the PDF is scanned, so there's no extractable text; or (2) the numbers are far from the left edge. Try toggling the \"wider search column\" option to push the search zone further right." },
+  { q: 'Does it remove the vertical rule between the numbers and the text?', a: "No. That rule is a vector path, not text — removing it reliably without damaging the rest of the page is out of scope for a tool that promises not to touch your content. Most readers are used to the bare rule." },
+  { q: 'Will the line numbers come back if I OCR the output?', a: "No. We whiteout the number's bounding box in the PDF page, which is a visible change. OCR over the output won't re-discover the numbers because they're visually gone." },
+  { q: 'Is the original file modified?', a: 'Never. Your input file is untouched — we produce a fresh copy with the line numbers removed. Nothing is uploaded, nothing is stored server-side (there is no server).' },
+];
+
+const sd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'DontTouchMyDoc Remove Line Numbers',
+    url: 'https://donttouchmydoc.com/remove-line-numbers',
+    applicationCategory: 'Utilities',
+    operatingSystem: 'Any (browser-based)',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') },
+    })),
+  },
+];
+---
+<BaseLayout title={title} description={description} path="/remove-line-numbers" structuredData={sd}>
+  <ToolHeader
+    kicker="Tool · 04"
+    title="Remove line numbers"
+    tagline="Strip the 1-through-28 gutter from court transcripts and legal filings."
+    description="Drop the PDF, we detect the line-number column, and hand back a copy with those numbers whited out. The body text, formatting and pagination stay exactly where they were."
+    accent="ink"
+  >
+    <svg slot="icon" viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h3M3 12h3M3 18h3M10 6h11M10 12h11M10 18h11"/></svg>
+  </ToolHeader>
+
+  <RemoveLineNumbersTool />
+  <AdSlot position="remove-lines-under-tool" size="970x250" />
+  <HowItWorks steps={steps} heading="How the removal works" />
+  <Faq items={faq} heading="Remove line numbers · FAQ" />
+  <AdSlot position="remove-lines-faq-bottom" size="728x90" />
+  <RelatedTools current="remove-lines" />
+</BaseLayout>

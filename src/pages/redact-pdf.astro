@@ -1,0 +1,67 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ToolHeader from '../components/ToolHeader.astro';
+import RedactTool from '../components/tools/RedactTool.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Faq from '../components/Faq.astro';
+import RelatedTools from '../components/RelatedTools.astro';
+import AdSlot from '../components/AdSlot.astro';
+
+const title = 'Redact PDF online, free — permanently black out sensitive info · DontTouchMyDoc';
+const description = 'Draw black boxes over sensitive text, numbers or signatures in a PDF. The underlying content is genuinely destroyed — not just covered. Runs entirely in your browser.';
+
+const steps = [
+  { title: 'Open a PDF', body: 'Drop a file and we render each page locally with PDF.js. No upload, no preview server.' },
+  { title: 'Draw the boxes', body: 'Click and drag over anything sensitive. Click a box to remove it. Step through pages with Prev / Next.' },
+  { title: 'Apply & download', body: 'Pages with boxes are flattened to images (with the boxes painted in) before saving. Pages without any redactions stay untouched — full quality.' },
+];
+
+const faq = [
+  { q: 'Is this genuine redaction, or just a black box over the text?', a: "Genuine. On save, every page that has at least one redaction is re-rendered to a raster image with the black boxes painted onto the pixels before being placed back into the output. There is no hidden text layer underneath the black — it's been replaced with a solid-black image." },
+  { q: "Why do redacted pages sometimes look different / not selectable?", a: "Because they've been flattened to an image to guarantee the text beneath the redactions is destroyed. Pages you didn't touch keep their original vector content and stay fully selectable. If your whole document gets redactions, the whole output becomes image-based." },
+  { q: 'Can someone recover the redacted text by copying or OCR?', a: "No. Copying won't work because the text object is gone — only pixels remain. OCR run on the output will see a solid-black rectangle and return nothing. This is how professional redaction tools work." },
+  { q: 'How big a box should I draw?', a: 'A little bigger than the text — aim to cover any descenders (like "g", "p", "y") and any stray marks. Better to over-redact than leave a sliver of a character visible.' },
+  { q: 'Does this work on scanned PDFs?', a: 'Yes — since the whole page becomes an image anyway, it doesn\'t matter whether the original was text-based or a scan. The redactions land cleanly on the rendered pixels.' },
+  { q: 'What about the vertical rule between line numbers and text in court transcripts?', a: "Redaction can cover any part of the page — just draw a box over the section you want gone, including the rule." },
+];
+
+const sd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'DontTouchMyDoc Redact PDF',
+    url: 'https://donttouchmydoc.com/redact-pdf',
+    applicationCategory: 'Utilities',
+    operatingSystem: 'Any (browser-based)',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') },
+    })),
+  },
+];
+---
+<BaseLayout title={title} description={description} path="/redact-pdf" structuredData={sd}>
+  <ToolHeader
+    kicker="Tool · 06"
+    title="Redact PDF"
+    tagline="Black out sensitive info — permanently, and without uploading the document."
+    description="Click and drag over names, account numbers, signatures or anything else that shouldn't travel. Pages with redactions get flattened to images before saving, so the underlying text is genuinely destroyed — not just hidden."
+    accent="ink"
+  >
+    <svg slot="icon" viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="10" width="18" height="6"/></svg>
+  </ToolHeader>
+
+  <RedactTool />
+  <AdSlot position="redact-under-tool" size="970x250" />
+  <HowItWorks steps={steps} heading="How redaction works here" />
+  <Faq items={faq} heading="Redact PDF · FAQ" />
+  <AdSlot position="redact-faq-bottom" size="728x90" />
+  <RelatedTools current="redact" />
+</BaseLayout>

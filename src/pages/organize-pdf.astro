@@ -1,0 +1,66 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ToolHeader from '../components/ToolHeader.astro';
+import OrganizeTool from '../components/tools/OrganizeTool.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Faq from '../components/Faq.astro';
+import RelatedTools from '../components/RelatedTools.astro';
+import AdSlot from '../components/AdSlot.astro';
+
+const title = 'Organize PDF pages online, free — rearrange, rotate, delete · DontTouchMyDoc';
+const description = 'Rearrange, rotate and delete PDF pages inside your browser. Visual thumbnails, drag-to-reorder, bulk rotation. Your files never leave your device.';
+
+const steps = [
+  { title: 'Open a PDF', body: 'Drop a file. We render thumbnails locally with PDF.js so you can see what you\'re working with.' },
+  { title: 'Rearrange, rotate, delete', body: 'Drag thumbnails to reorder, click to select, then rotate or delete one or many at once.' },
+  { title: 'Save the organised PDF', body: 'We rebuild the output with pdf-lib — page content is copied intact, just reordered and rotated. No rasterisation.' },
+];
+
+const faq = [
+  { q: 'Does this re-render my pages?', a: "No. Pages are copied byte-accurately using <a href='https://pdf-lib.js.org' class='underline'>pdf-lib</a> — text stays selectable, images stay sharp, fonts are preserved. Only the page order and rotation are changed." },
+  { q: 'How do I select multiple pages?', a: "Click a page to select it; Cmd/Ctrl-click to toggle individual pages; Shift-click to select a range. Or hit \"Select all\" and work backwards with Cmd/Ctrl-click to untick what you want to keep." },
+  { q: 'What does "rotate" do to the page content?', a: "Sets the page's rotation flag in the PDF — the same thing a viewer shows when you rotate via View → Rotate. The content isn't pixel-rotated, so quality is unchanged." },
+  { q: "Can I split a PDF this way?", a: "For simple splitting (every page into its own file, or custom ranges), the <a href='/split-pdf' class='underline'>Split tool</a> is tuned for that. Organise is better when you want to delete some pages but keep the rest in a single output." },
+  { q: 'Password-protected PDFs?', a: "Not supported. Unlock the PDF in your native viewer first, then come back." },
+];
+
+const sd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'DontTouchMyDoc Organize PDF',
+    url: 'https://donttouchmydoc.com/organize-pdf',
+    applicationCategory: 'Utilities',
+    operatingSystem: 'Any (browser-based)',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') },
+    })),
+  },
+];
+---
+<BaseLayout title={title} description={description} path="/organize-pdf" structuredData={sd}>
+  <ToolHeader
+    kicker="Tool · 05"
+    title="Organise pages"
+    tagline="Rearrange, rotate and delete PDF pages — visually, inside your browser."
+    description="Drag the thumbnails, select the stragglers, rotate the sideways scans, delete what doesn't belong. Your pages are copied byte-accurately into the output — no re-rendering, no quality loss."
+    accent="navy"
+  >
+    <svg slot="icon" viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="7" height="7"/><rect x="14" y="4" width="7" height="7"/><rect x="3" y="13" width="7" height="7"/><rect x="14" y="13" width="7" height="7"/></svg>
+  </ToolHeader>
+
+  <OrganizeTool />
+  <AdSlot position="organize-under-tool" size="970x250" />
+  <HowItWorks steps={steps} heading="Organising, step by step" />
+  <Faq items={faq} heading="Organise · FAQ" />
+  <AdSlot position="organize-faq-bottom" size="728x90" />
+  <RelatedTools current="organize" />
+</BaseLayout>
