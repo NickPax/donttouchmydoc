@@ -33,32 +33,35 @@ Open http://localhost:4321.
 | `npm run preview` | Preview the built site locally                     |
 | `npm run deploy` | Build and deploy to Cloudflare Pages (requires `wrangler`) |
 
-## Deploying to Cloudflare Pages
+## Deploying
 
-### One-off (from your machine)
+Production deploys are **automatic on push to `main`** via a GitHub Actions
+workflow at `.github/workflows/deploy.yml`. The workflow builds the site and
+ships it to Cloudflare Pages via `wrangler`.
+
+### Required GitHub secrets
+
+Set these at **Repo → Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret                      | Where to get it                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`      | Cloudflare dashboard → **My Profile → API Tokens → Create Token** → use the **"Edit Cloudflare Workers"** template (it includes Pages edit), or a custom token with *Account → Cloudflare Pages → Edit*. |
+| `CLOUDFLARE_ACCOUNT_ID`     | Any Cloudflare dashboard URL — the first path segment after `dash.cloudflare.com/<account-id>/`. Also visible in the Workers & Pages sidebar. |
+| `PUBLIC_CF_ANALYTICS_TOKEN` | The Web Analytics beacon token (from Analytics & Logs → Web Analytics → the site). Public once deployed — still stored as a secret for convenience. |
+| `PUBLIC_ADS_ENABLED`        | *(Optional)* — set to `placeholder` for dev preview stripes, `true` to render real AdSense. |
+| `PUBLIC_ADSENSE_CLIENT`     | *(Optional)* — `ca-pub-…` from AdSense, only read when `PUBLIC_ADS_ENABLED=true`. |
+
+### Manual deploy from your machine
+
+Still works as a backup:
 
 ```bash
-npm run build
-npx wrangler pages deploy ./dist --project-name=donttouchmydoc
+PUBLIC_CF_ANALYTICS_TOKEN=<token> npm run deploy
 ```
 
-Or the combined script:
-
-```bash
-npm run deploy
-```
-
-### Connected to Git (recommended)
-
-In the Cloudflare dashboard:
-
-1. **Pages → Create project → Connect to Git**, select this repository.
-2. Build command: `npm run build`
-3. Build output directory: `dist`
-4. Node version: 20+ (set `NODE_VERSION=20` in the project's environment variables if needed).
-5. Add custom domain `donttouchmydoc.com`.
-
-That's it — every push to `main` ships a new build.
+This runs `astro build && wrangler pages deploy ./dist`. Useful for emergency
+patches if GitHub Actions is down or you want to test a deploy locally before
+pushing.
 
 ## Project layout
 
