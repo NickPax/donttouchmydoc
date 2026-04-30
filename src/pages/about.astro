@@ -16,9 +16,10 @@ const steps = [
 
 const faq = [
   { q: "How can I verify you're not uploading?", a: "Two ways. (1) Open your browser's DevTools and switch to the Network tab. Use any of the tools. You'll see the page load, the tool's code chunks load, and then — silence. No file uploads, no POSTs to an API, no background pings. (2) Read the source directly at <a href='https://github.com/NickPax/donttouchmydoc' class='underline'>github.com/NickPax/donttouchmydoc</a> — every line of the tool logic is public." },
-  { q: 'Do you use cookies or localStorage?', a: 'No cookies. No localStorage writes from our tools. We don\'t need either to run, so we don\'t use them. No cookie banner required.' },
+  { q: 'Do you use cookies or localStorage?', a: "No cookies. The only thing we write to localStorage is your light/dark mode preference, set by the theme toggle in the header — a single key called <span class='font-mono'>theme</span> with the value <span class='font-mono'>light</span> or <span class='font-mono'>dark</span>. Nothing about your files, nothing that identifies you. No cookie banner required." },
   { q: 'Do you track analytics?', a: "Not at launch. When we do, we'll use a lightweight privacy-preserving counter (think Plausible or similar, self-hosted), and we'll say so here. No Google Analytics, no Facebook pixel." },
   { q: 'Why does the site have ads?', a: "Tools this useful aren't free to build and maintain. A small number of contextual ads keeps the lights on without adding a paywall. Ads never see your files — they're scoped to the page layout, not the tool." },
+  { q: 'Are there sister sites?', a: "Two of them, same principle (nothing uploads, ever) applied to different file types: <a href='https://donttouchmypic.com' target='_blank' rel='noopener noreferrer' class='underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4'>DontTouchMyPic</a> for images and <a href='https://donttouchmyvid.com' target='_blank' rel='noopener noreferrer' class='underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4'>DontTouchMyVid</a> for video." },
 ];
 ---
 <BaseLayout title={title} description={description} path="/about">
@@ -116,7 +117,7 @@ const faq = [
           Our tools use two open-source libraries — <span class="font-mono">pdf-lib</span> and <span class="font-mono">pdf.js</span> — bundled into the page. They run inside your browser's sandbox. We cannot read what happens there, and neither can anyone else.
         </p>
         <p>
-          We don't set cookies. We don't use localStorage. We don't run third-party scripts inside the tools. If we ever add analytics, it will be a privacy-preserving counter, and we'll say so on this page with the date we added it.
+          We don't set cookies. The only thing we write to localStorage is your light/dark mode preference (a single <span class="font-mono">theme</span> key, set by the toggle in the header). We don't run third-party scripts inside the tools. If we ever add analytics, it will be a privacy-preserving counter, and we'll say so on this page with the date we added it.
         </p>
         <p>
           To earn the site its keep, we plan to serve a small number of contextual ads around the tools. Ads render in their own frames — they don't and can't peek at the PDF you're working on. If the trade-off isn't to your taste, uBlock is a perfectly reasonable response.
