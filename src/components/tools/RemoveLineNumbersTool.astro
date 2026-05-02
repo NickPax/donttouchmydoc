@@ -25,6 +25,9 @@ import AdSlot from '../AdSlot.astro';
             Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse</button>.
             Works on text-based PDFs — court transcripts, legislative drafts, annotated editions.
           </p>
+          <p class="picker-tip mt-3 text-xs italic text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">
+            Tip — Chrome on macOS sorts the open dialog oddly. Press <strong class="not-italic">Cmd+2</strong> in the dialog for Finder-style list view (it sticks per folder). Or drag files in.
+          </p>
           <p class="mt-3 font-mono text-[11px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">
             No OCR · no uploads · text-based PDFs only
           </p>
@@ -276,6 +279,7 @@ import AdSlot from '../AdSlot.astro';
     hideWarn();
     resultEl.classList.add('hidden');
     panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     docName.textContent = f.name;
     docMeta.textContent = `${formatBytes(f.size)} · reading…`;
     summary.classList.add('hidden');

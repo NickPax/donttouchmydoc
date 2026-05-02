@@ -490,5 +490,15 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--color-emerald-
   border-radius: 2px;
 }
 
+/* Tool dropzone hint, only revealed for Chromium on macOS where the file
+   dialog sorts differently than Finder. Flag set in BaseLayout. */
+.picker-tip { display: none; }
+:root[data-mac-chrome="1"] .picker-tip { display: block; }
+
+/* Smooth anchor jumps (#tools, etc.) while respecting reduced-motion users. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
 /* Ensure content sits above the paper grain */
 main, header, footer, nav { position: relative; z-index: 1; }

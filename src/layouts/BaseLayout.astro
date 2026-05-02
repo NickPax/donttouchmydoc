@@ -85,6 +85,13 @@ const cfAnalyticsToken = import.meta.env.PUBLIC_CF_ANALYTICS_TOKEN as string | u
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'light');
       }
+      // Chromium on macOS uses a file dialog whose default sort differs from
+      // Finder (e.g. files starting with "_" land in unexpected positions).
+      // Flag it so tool dropzones can surface a "drag instead" hint.
+      var ua = navigator.userAgent || '';
+      if (/Mac/.test(ua) && /Chrome\//.test(ua)) {
+        document.documentElement.setAttribute('data-mac-chrome', '1');
+      }
     })();
   </script>
 

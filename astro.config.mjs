@@ -8,6 +8,12 @@ export default defineConfig({
   integrations: [sitemap()],
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      // Allow dev to serve files from parent directories so the dev server
+      // works when running from a git worktree (e.g. .claude/worktrees/<name>),
+      // where node_modules lives in the main repo a few levels up.
+      fs: { allow: ['..', '../..', '../../..'] },
+    },
     optimizeDeps: {
       // Pre-bundle the client-side PDF libs used by inline <script> blocks.
       // Providing explicit entries stops esbuild from trying to scan .astro files itself.

@@ -27,6 +27,9 @@ import AdSlot from '../AdSlot.astro';
             Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse</button>.
             Click-and-drag black boxes over anything sensitive. The text underneath is genuinely destroyed in the output.
           </p>
+          <p class="picker-tip mt-3 text-xs italic text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">
+            Tip — Chrome on macOS sorts the open dialog oddly. Press <strong class="not-italic">Cmd+2</strong> in the dialog for Finder-style list view (it sticks per folder). Or drag files in.
+          </p>
         </div>
         <input id="file-input" type="file" accept="application/pdf,.pdf" class="sr-only" />
       </div>
@@ -60,8 +63,8 @@ import AdSlot from '../AdSlot.astro';
             </div>
             <div class="flex items-center gap-2">
               <span id="redaction-count" class="chip">0 redactions</span>
-              <button id="clear-page" class="btn btn-ghost !py-2 !px-3" title="Clear redactions on this page">Clear page</button>
-              <button id="clear-all" class="btn btn-ghost !py-2 !px-3 text-[var(--color-red-stamp)] border-[var(--color-red-stamp)] hover:bg-[var(--color-red-stamp)] hover:text-[var(--color-paper)]">Clear all</button>
+              <button id="clear-page" class="btn btn-ghost !py-2 !px-3" title="Clear redactions on this page">Clear redactions (page)</button>
+              <button id="clear-all" class="btn btn-ghost !py-2 !px-3 text-[var(--color-red-stamp)] border-[var(--color-red-stamp)] hover:bg-[var(--color-red-stamp)] hover:text-[var(--color-paper)]">Clear redactions (all)</button>
             </div>
           </div>
 
@@ -205,6 +208,7 @@ import AdSlot from '../AdSlot.astro';
     currentFile = f;
     redactions.clear();
     workspace.classList.remove('hidden');
+    workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
     docName.textContent = f.name;
     docMeta.textContent = `${formatBytes(f.size)} · loading…`;
     saveBtn.disabled = true;

@@ -23,6 +23,9 @@ import AdSlot from '../AdSlot.astro';
             Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse from your device</button>.
             Previews render locally, like everything else.
           </p>
+          <p class="picker-tip mt-3 text-xs italic text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">
+            Tip — Chrome on macOS sorts the open dialog oddly. Press <strong class="not-italic">Cmd+2</strong> in the dialog for Finder-style list view (it sticks per folder). Or drag files in.
+          </p>
         </div>
         <input id="file-input" type="file" accept="application/pdf,.pdf" class="sr-only" />
       </div>
@@ -219,6 +222,7 @@ import AdSlot from '../AdSlot.astro';
     currentFile = f;
     note.textContent = 'reading…';
     panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     docName.textContent = f.name;
     docMeta.textContent = `${formatBytes(f.size)} · loading…`;
     thumbs.innerHTML = '';

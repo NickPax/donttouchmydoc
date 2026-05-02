@@ -25,6 +25,9 @@ import AdSlot from '../AdSlot.astro';
             Or <button type="button" id="browse" class="underline decoration-[var(--color-emerald-dk)] decoration-2 underline-offset-4">browse from your device</button>.
             They stay on your device — the "Merge" button runs inside this tab.
           </p>
+          <p class="picker-tip mt-3 text-xs italic text-[color-mix(in_srgb,var(--color-ink)_60%,transparent)]">
+            Tip — Chrome on macOS sorts the open dialog oddly. Press <strong class="not-italic">Cmd+2</strong> in the dialog for Finder-style list view (it sticks per folder). Or drag files in.
+          </p>
           <p class="mt-4 font-mono text-[11px] tracking-[0.18em] uppercase text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]">
             PDF · up to as many as your RAM allows
           </p>
@@ -135,6 +138,7 @@ import AdSlot from '../AdSlot.astro';
   async function addFiles(files: FileList | File[]) {
     const list = Array.from(files).filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
     if (!list.length) { showErr('Only PDF files are accepted.'); return; }
+    const wasEmpty = items.length === 0;
     for (const file of list) {
       if (file.size > 100 * 1024 * 1024) {
         showErr(`"${file.name}" is over 100 MB — consider compressing first.`);
@@ -154,6 +158,7 @@ import AdSlot from '../AdSlot.astro';
       });
     }
     render();
+    if (wasEmpty) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function render() {
