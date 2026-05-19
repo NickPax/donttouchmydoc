@@ -1,5 +1,10 @@
 ---
-const year = new Date().getFullYear();
+import pkg from '../../package.json';
+
+const now = new Date();
+const year = now.getUTCFullYear();
+const pad = (n: number) => String(n).padStart(2, '0');
+const buildId = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`;
 const tools = [
   { href: '/merge-pdf',           label: 'Merge PDF' },
   { href: '/split-pdf',           label: 'Split PDF' },
@@ -97,7 +102,7 @@ const tools = [
   <div class="border-t border-[var(--color-rule)]">
     <div class="mx-auto max-w-[1320px] px-5 sm:px-8 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono text-[color-mix(in_srgb,var(--color-ink)_65%,transparent)]">
       <span>© {year} DontTouchMyDoc. Built without your files.</span>
-      <span class="tracking-[0.18em] uppercase">v0.1.0 · donttouchmydoc.com</span>
+      <span class="tracking-[0.18em] uppercase">v{pkg.version} · build {buildId} · donttouchmydoc.com</span>
     </div>
   </div>
 </footer>
